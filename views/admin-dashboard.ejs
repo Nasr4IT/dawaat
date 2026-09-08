@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم — دعوات</title>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      دعوات — الإدارة
+      <% if (newCount > 0) { %><span class="new-badge"><%= newCount %> جديد</span><% } %>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <a href="/admin/settings" class="btn btn-ghost btn-sm">الإعدادات</a>
+      <form method="POST" action="/admin/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-ghost btn-sm" type="submit">تسجيل الخروج</button></form>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h1>الطلبات<% if (total > 0) { %> <span class="muted" style="font-size:14px; font-weight:400;">(<%= total %>)</span><% } %></h1>
+      <a href="/admin/orders/new" class="btn">+ طلب جديد</a>
+    </div>
+
+    <form method="GET" action="/admin" class="filter-bar">
+      <input type="text" name="q" value="<%= q %>" placeholder="بحث بالاسم أو رقم الهاتف">
+      <select name="status">
+        <option value="">كل الحالات</option>
+        <% ['lead','confirmed','paid','published'].forEach(s => { %>
+          <option value="<%= s %>" <%= status === s ? 'selected' : '' %>><%= STATUS_LABELS[s] %></option>
+        <% }) %>
+      </select>
+      <button class="btn btn-sm" type="submit">بحث</button>
+      <% if (q || status) { %><a href="/admin" class="btn btn-ghost btn-sm">مسح</a><% } %>
+    </form>
+
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <% if (orders.length === 0) { %>
+        <div class="empty">
+          <% if (q || status) { %>
+            لا توجد طلبات مطابقة لبحثكم.
+          <% } else { %>
+            لا توجد طلبات بعد — ستظهر هنا طلبات الموقع تلقائياً، أو أضف طلباً يدوياً.
+          <% } %>
+        </div>
+      <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>العروسان</th>
+            <th>الباقة</th>
+            <th>الحالة</th>
+            <th>المصدر</th>
+            <th>الهاتف</th>
+            <th>الحضور</th>
+            <th>تاريخ الإنشاء</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(o => { %>
+          <tr class="<%= !o.viewed_at ? 'row-new' : '' %>">
+            <td><%= o.groom_name %> و<%= o.bride_name %><% if (!o.viewed_at) { %> <span class="new-dot" title="طلب جديد لم يُفتح بعد"></span><% } %></td>
+            <td><%= PLAN_LABELS[o.plan] || o.plan %></td>
+            <td><span class="badge badge-<%= o.status %>"><%= STATUS_LABELS[o.status] || o.status %></span></td>
+            <td class="muted"><%= o.source === 'landing_form' ? 'نموذج الموقع' : 'يدوي' %></td>
+            <td><%= o.phone || '—' %></td>
+            <td><%= o.rsvp_yes %> / <%= o.rsvp_count %><% if (o.guest_count > 0) { %> <span class="muted">(<%= o.guest_count %> رابط ضيف)</span><% } %></td>
+            <td class="muted"><%= o.created_at %></td>
+            <td><a href="/admin/orders/<%= o.id %>" class="btn btn-ghost btn-sm">فتح</a></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <div class="pagination">
+        <% if (currentPage > 1) { %>
+          <a href="/admin?<%= filterQS %><%= filterQS ? '&' : '' %>page=<%= currentPage - 1 %>" class="btn btn-ghost btn-sm">السابق</a>
+        <% } else { %>
+          <span class="btn btn-ghost btn-sm disabled">السابق</span>
+        <% } %>
+        <span class="muted">صفحة <%= currentPage %> من <%= totalPages %></span>
+        <% if (currentPage < totalPages) { %>
+          <a href="/admin?<%= filterQS %><%= filterQS ? '&' : '' %>page=<%= currentPage + 1 %>" class="btn btn-ghost btn-sm">التالي</a>
+        <% } else { %>
+          <span class="btn btn-ghost btn-sm disabled">التالي</span>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

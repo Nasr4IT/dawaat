@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>طلب جديد — دعوات</title>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">دعوات — الإدارة</div>
+    <a href="/admin" class="btn btn-ghost btn-sm">رجوع للوحة</a>
+  </div>
+  <div class="wrap">
+    <h1>إنشاء طلب جديد</h1>
+    <div class="card">
+      <% if (typeof error !== 'undefined' && error) { %><div class="error"><%= error %></div><% } %>
+      <form method="POST" action="/admin/orders">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+          <div class="form-group"><label>اسم العريس</label><input type="text" name="groom_name" value="<%= order && order.groom_name || '' %>" required></div>
+          <div class="form-group"><label>اسم العروس</label><input type="text" name="bride_name" value="<%= order && order.bride_name || '' %>" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>تاريخ الحفل</label><input type="date" name="event_date" value="<%= order && order.event_date || '' %>"></div>
+          <div class="form-group"><label>وقت الحفل</label><input type="time" name="event_time" value="<%= order && order.event_time || '' %>"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>مكان الحفل</label><input type="text" name="venue" value="<%= order && order.venue || '' %>"></div>
+          <div class="form-group"><label>رقم الهاتف</label><input type="text" name="phone" value="<%= order && order.phone || '' %>"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>الباقة</label>
+            <select name="plan">
+              <option value="basic">الأساسية</option>
+              <option value="featured" selected>المميزة</option>
+              <option value="luxury">الفاخرة</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>نمط التصميم</label>
+            <select name="style">
+              <option value="v1">البوابات الذهبية</option>
+              <option value="v2">الورد المتطاير</option>
+              <option value="v3">الخط العربي</option>
+              <option value="v4">قصاصات الاحتفال (تخرج)</option>
+              <option value="v5">أضواء دافئة</option>
+              <option value="v6">قلوب متطايرة</option>
+              <option value="v7">فوانيس معلّقة</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>ملاحظات</label>
+          <textarea name="note"><%= order && order.note || '' %></textarea>
+        </div>
+        <button class="btn" type="submit">إنشاء الطلب</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

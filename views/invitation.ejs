@@ -1,0 +1,1043 @@
+<!-- eslint-disable -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= order.groom_name %> و<%= order.bride_name %> — دعوة زفاف</title>
+
+<%
+  // -------- All EJS logic is here, outside <style> and <script> --------
+  const ogTitle = order.groom_name + ' و' + order.bride_name + ' — دعوة زفاف';
+  const ogDescParts = [];
+  if (order.event_date) ogDescParts.push('بتاريخ ' + order.event_date);
+  if (order.venue) ogDescParts.push(order.venue);
+  const ogDesc = ogDescParts.length ? ogDescParts.join(' — ') : 'يسرنا دعوتكم لمشاركتنا فرحتنا';
+  const ogImage = (typeof BASE_URL !== 'undefined' ? BASE_URL : '') + '/assets/og/' + (order.style || 'v1') + '.jpg';
+  const ogUrl = (typeof BASE_URL !== 'undefined' ? BASE_URL : '') + '/invite/' + order.slug;
+
+  // Palette definitions
+  const palettes = {
+    v1: { bg:'#0a0a0a', surface:'#15120c', ink:'#f5efe0', accent:'#d8b565', accentDeep:'#b8892b', muted:'#a89a7c', font:"'Aref Ruqaa', serif" },
+    v2: { bg:'#1a0507', surface:'#2a0a0d', ink:'#f7e9e6', accent:'#e8747f', accentDeep:'#b5121b', muted:'#c79a9a', font:"'Amiri', serif" },
+    v3: { bg:'#fffaf0', surface:'#ffffff', ink:'#2a2115', accent:'#b8892b', accentDeep:'#8a6423', muted:'#8a7a5c', font:"'Lateef', serif" },
+    v4: { bg:'#0d1b2a', surface:'#132b40', ink:'#f2ede0', accent:'#f4c542', accentDeep:'#c99a1e', muted:'#9db1c4', font:"'Rakkas', cursive" },
+    v5: { bg:'#1a0f1f', surface:'#26162c', ink:'#f5ecdc', accent:'#e8b45c', accentDeep:'#b8892b', muted:'#b19aad', font:"'El Messiri', sans-serif" },
+    v6: { bg:'#fff0f2', surface:'#ffffff', ink:'#3a1c22', accent:'#d8607a', accentDeep:'#b03a56', muted:'#a97e88', font:"'Marhey', sans-serif" },
+    v7: { bg:'#1f0a08', surface:'#2c110d', ink:'#f5e9dc', accent:'#e0793f', accentDeep:'#b8892b', muted:'#c2a08e', font:"'Jomhuria', cursive" },
+  };
+  const styleNames = {
+    v1: 'البوابات الذهبية', v2: 'الورد المتطاير', v3: 'الخط العربي',
+    v4: 'قصاصات الاحتفال', v5: 'أضواء دافئة', v6: 'قلوب متطايرة', v7: 'فوانيس معلّقة',
+  };
+  const pal = palettes[order.style] || palettes.v1;
+  const styleName = styleNames[order.style] || '';
+
+  // Build CSS variables string
+  const cssVars = `:root{ --bg:${pal.bg}; --surface:${pal.surface}; --ink:${pal.ink}; --accent:${pal.accent}; --accent-deep:${pal.accentDeep}; --muted:${pal.muted}; --heading-font:${pal.font}; }`;
+
+  // Serialize data for JavaScript
+  const jsData = {
+    style: order.style || 'v1',
+    bgStickers: typeof backgroundStickers !== 'undefined' ? backgroundStickers : [],
+    accent: pal.accent,
+    isDemo: typeof isDemo !== 'undefined' ? isDemo : false,
+  };
+
+  // Bride/groom watermark photos behind the card: prefer the two individual
+  // photos; if only the shared couple photo exists, show that once instead
+  // of duplicating it on both sides; if nothing was uploaded, show none.
+  const hasIndividualPhotos = Boolean(order.bride_photo_url || order.groom_photo_url);
+  const watermarkBride = hasIndividualPhotos ? (order.bride_photo_url || order.photo_url || null) : null;
+  const watermarkGroom = hasIndividualPhotos ? (order.groom_photo_url || order.photo_url || null) : null;
+  const watermarkSingle = !hasIndividualPhotos ? (order.photo_url || null) : null;
+%>
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="<%= ogTitle %>">
+<meta property="og:description" content="<%= ogDesc %>">
+<meta property="og:image" content="<%= ogImage %>">
+<meta property="og:url" content="<%= ogUrl %>">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= ogTitle %>">
+<meta name="twitter:description" content="<%= ogDesc %>">
+<meta name="twitter:image" content="<%= ogImage %>">
+
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&family=Lateef:wght@400;700&family=Rakkas&family=El+Messiri:wght@400;700&family=Marhey:wght@400;700&family=Jomhuria&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<!-- ========== STYLES ========== -->
+<style>
+  <%- cssVars %>
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Tajawal', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  #fx {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ====== الملصقات العائمة الخلفية (من إعدادات الموقع) ====== */
+  .bg-sticker {
+    position: fixed;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 4.5s ease, transform 14s ease;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.08));
+  }
+  .bg-sticker.show { opacity: 0.45; }
+
+  /* ====== ملصقات العروس والعريس الجانبية (من إعدادات الموقع العامة) ====== */
+  .corner-sticker.bride { position: fixed; bottom: 20px; right: 20px; width: 100px; opacity: 0.7; z-index: 10; }
+  .corner-sticker.groom { position: fixed; bottom: 20px; left: 20px; width: 100px; opacity: 0.7; z-index: 10; }
+  @media (max-width: 600px) {
+    .corner-sticker.bride, .corner-sticker.groom { width: 60px; bottom: 10px; }
+  }
+
+  /* ====== زر تشغيل الموسيقى ====== */
+  #musicToggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 20;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 18px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    transition: opacity .5s ease;
+  }
+  #musicToggle.show { display: flex; }
+  #musicToggle.playing { animation: musicPulse 2.4s ease-in-out infinite; }
+  @keyframes musicPulse { 0%,100%{ box-shadow:0 4px 14px rgba(0,0,0,0.15); } 50%{ box-shadow:0 4px 20px var(--accent); } }
+
+  /* ====== فيديو البداية ====== */
+  #introOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.9s ease;
+  }
+  #introOverlay.hide { opacity: 0; pointer-events: none; }
+  #introOverlay video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #introSkip {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.45);
+    padding: 9px 20px;
+    font-size: 12px;
+    font-family: 'Tajawal', sans-serif;
+    cursor: pointer;
+    border-radius: 20px;
+    opacity: 0;
+    transition: opacity .4s ease;
+    backdrop-filter: blur(2px);
+  }
+  #introSkip.show { opacity: 1; }
+  body.intro-active { overflow: hidden; height: 100vh; }
+
+  /* ====================================================================
+     بطاقة الدعوة — كل المحتوى داخل بطاقة واحدة ثابتة، بلا تمرير بين
+     شاشات كاملة. العناصر تظهر بترتيب زمني عند التحميل (أو بعد انتهاء
+     فيديو المقدمة)، بدل الظهور المرتبط بالتمرير.
+     ==================================================================== */
+  .page-wrap {
+    position: relative;
+    z-index: 3;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    align-items: safe center;
+    justify-content: center;
+    padding: 36px 18px;
+  }
+
+  .invite-card {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    background: var(--surface);
+    border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+    padding: 42px 30px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  /* صور خلفية باهتة للعروسين داخل البطاقة */
+  .card-watermark {
+    position: absolute;
+    z-index: 0;
+    object-fit: cover;
+    opacity: 0.16;
+    filter: grayscale(1) contrast(0.9);
+    pointer-events: none;
+    -webkit-mask-image: radial-gradient(circle at center, black 35%, transparent 72%);
+    mask-image: radial-gradient(circle at center, black 35%, transparent 72%);
+  }
+  .card-watermark.bride { top: -6%; right: -12%; width: 62%; height: 46%; }
+  .card-watermark.groom { bottom: -6%; left: -12%; width: 62%; height: 46%; }
+  .card-watermark.single {
+    top: 50%; left: 50%; width: 78%; height: 60%;
+    transform: translate(-50%, -50%);
+  }
+
+  .invite-card > *:not(.card-watermark) { position: relative; z-index: 1; }
+
+  /* عناصر تظهر تدريجياً مع التمرير: تنزلق من يمين أو يسار الشاشة وتتلاشى
+     للظهور عند دخولها نطاق الرؤية (IntersectionObserver)، بدل الظهور الفوري
+     عند التحميل. */
+  .reveal-item {
+    opacity: 0;
+    transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    margin: 14px 0;
+  }
+  .reveal-item.from-right { transform: translateX(52px); }
+  .reveal-item.from-left { transform: translateX(-52px); }
+  .reveal-item.visible { opacity: 1; transform: translateX(0); }
+
+  .bismillah {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.2rem, 4vw, 1.6rem);
+    color: var(--accent);
+  }
+  [data-style="v1"] .bismillah, [data-style="v2"] .bismillah,
+  [data-style="v4"] .bismillah, [data-style="v5"] .bismillah,
+  [data-style="v7"] .bismillah { color: #d8b565; }
+
+  .hamdallah {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(0.95rem, 3vw, 1.15rem);
+    color: var(--accent);
+    opacity: 0.9;
+  }
+
+  .invite-text {
+    font-family: 'Tajawal', sans-serif;
+    font-size: clamp(0.85rem, 2.4vw, 0.95rem);
+    color: var(--muted);
+    line-height: 1.9;
+  }
+
+  .names-line {
+    font-family: var(--heading-font);
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .names-line .amp { color: var(--accent); font-size: 0.75em; margin: 0 6px; }
+
+  .details-box {
+    display: flex;
+    border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .details-box .col {
+    flex: 1;
+    padding: 12px 8px;
+    border-inline-start: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  }
+  .details-box .col:first-child { border-inline-start: none; }
+  .details-box .label {
+    display: block;
+    font-size: 11px;
+    color: var(--accent-deep);
+    margin-bottom: 6px;
+  }
+  .details-box .value {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  /* ====== العداد التنازلي + إضافة للتقويم (الباقتان المميزة والفاخرة) ====== */
+  .countdown {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .countdown .cd-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: color-mix(in srgb, var(--muted) 12%, transparent);
+    border-radius: 10px;
+    padding: 10px 6px;
+    min-width: 56px;
+  }
+  .countdown .cd-num {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .countdown .cd-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .countdown-done {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.1rem, 3.2vw, 1.35rem);
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .calendar-btn {
+    display: inline-block;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12px;
+    color: var(--accent-deep);
+    text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    padding: 8px 18px;
+    border-radius: 20px;
+    transition: background .2s ease;
+  }
+  .calendar-btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+  .notice-line {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+
+  .final-text {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.3rem, 4vw, 1.7rem);
+    color: var(--accent);
+    letter-spacing: 1px;
+    margin-top: 22px;
+  }
+
+  /* ====== نموذج تأكيد الحضور (RSVP) — امتداد طبيعي داخل نفس البطاقة ====== */
+  .rsvp-divider {
+    border: none;
+    border-top: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+    margin: 26px 0 22px;
+  }
+  .rsvp-title {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.1rem, 3.4vw, 1.4rem);
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .rsvp-form { text-align: right; }
+  .rsvp-form .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  .rsvp-row { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .rsvp-row label { font-size: 12px; color: var(--muted); }
+  .rsvp-row input, .rsvp-row select, .rsvp-row textarea {
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    color: var(--ink);
+    width: 100%;
+  }
+  .rsvp-row textarea { resize: vertical; min-height: 64px; }
+  .rsvp-submit {
+    width: 100%;
+    padding: 12px 20px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1408;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .2s ease, transform .1s ease;
+  }
+  .rsvp-submit:hover { background: var(--accent-deep); }
+  .rsvp-submit:active { transform: scale(0.98); }
+  .rsvp-submit:disabled { opacity: 0.6; cursor: default; }
+  .rsvp-feedback { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .rsvp-feedback.ok { color: #4caf6f; }
+  .rsvp-feedback.err { color: #e0596a; }
+  .rsvp-demo-note { font-size: 13px; color: var(--muted); line-height: 1.8; }
+
+  /* ====== عرض تجريبي (إن وجد) ====== */
+  .demo-banner {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--accent);
+    color: #fff;
+    text-align: center;
+    padding: 12px 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .demo-banner a {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    text-decoration: none;
+    padding: 6px 14px;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .demo-banner a:hover { background: rgba(255,255,255,0.32); }
+
+  /* ====== تحسينات الجوال ====== */
+  @media (max-width: 480px) {
+    .page-wrap { padding: 22px 12px; }
+    .invite-card { padding: 30px 18px; border-radius: 16px; }
+    .details-box { flex-direction: row; }
+    .details-box .col { padding: 10px 4px; }
+    .countdown .cd-cell { min-width: 48px; padding: 8px 4px; }
+    .countdown .cd-num { font-size: 1.05rem; }
+  }
+  @media (max-width: 340px) {
+    .details-box { flex-direction: column; }
+    .details-box .col { border-inline-start: none; border-top: 1px solid color-mix(in srgb, var(--muted) 30%, transparent); }
+    .details-box .col:first-child { border-top: none; }
+    .countdown .cd-cell { min-width: 42px; }
+  }
+</style>
+</head>
+
+<body data-style="<%= order.style %>">
+
+<!-- ====== ملصقات العروس والعريس الجانبية (إعدادات الموقع العامة، إن وجدت) ====== -->
+<% if (typeof brideStickerUrl !== 'undefined' && brideStickerUrl) { %>
+  <img src="<%= brideStickerUrl %>" class="corner-sticker bride" alt="عروس" />
+<% } %>
+<% if (typeof groomStickerUrl !== 'undefined' && groomStickerUrl) { %>
+  <img src="<%= groomStickerUrl %>" class="corner-sticker groom" alt="عريس" />
+<% } %>
+
+<!-- ====== خلفية كانفاس للتأثيرات البصرية ====== -->
+<canvas id="fx"></canvas>
+
+<!-- ====== Banner تجريبي (إن وجد) ====== -->
+<% if (typeof isDemo !== 'undefined' && isDemo) { %>
+<div class="demo-banner">
+  <span>هذه معاينة تجريبية لتصميم "<%= styleName %>" — البيانات هنا للتوضيح فقط</span>
+  <a href="/?style=<%= order.style %>#order">اطلبوا هذا التصميم</a>
+</div>
+<% } %>
+
+<div class="page-wrap">
+  <div class="invite-card" id="inviteCard">
+
+    <% if (watermarkBride) { %><img src="<%= watermarkBride %>" class="card-watermark bride" alt="" aria-hidden="true"><% } %>
+    <% if (watermarkGroom) { %><img src="<%= watermarkGroom %>" class="card-watermark groom" alt="" aria-hidden="true"><% } %>
+    <% if (watermarkSingle) { %><img src="<%= watermarkSingle %>" class="card-watermark single" alt="" aria-hidden="true"><% } %>
+
+    <!-- 1. بسم الله الرحمن الرحيم -->
+    <div class="reveal-item from-right bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+
+    <!-- 2. الحمد لله الذي تتم بنعمته الصالحات -->
+    <div class="reveal-item from-left hamdallah">الحمد لله الذي تتم بنعمته الصالحات</div>
+
+    <!-- 3. نص الدعوة -->
+    <div class="reveal-item from-right invite-text">
+      بكل الحب والود نتشرف بدعوتكم لمشاركتنا فرحة العمر وحضور حفل زفافنا
+    </div>
+
+    <!-- 4. أسماء العروسين -->
+    <div class="reveal-item from-left names-line">
+      <%= order.groom_name %><span class="amp">و</span><%= order.bride_name %>
+    </div>
+
+    <!-- 5. المكان / الوقت / التاريخ -->
+    <div class="reveal-item from-right details-box">
+      <div class="col">
+        <span class="label">المكان</span>
+        <span class="value"><%= order.venue || '—' %></span>
+      </div>
+      <div class="col">
+        <span class="label">الوقت</span>
+        <span class="value"><%= order.event_time || '—' %></span>
+      </div>
+      <div class="col">
+        <span class="label">التاريخ</span>
+        <span class="value"><%= order.event_date || 'سيُحدد لاحقاً' %></span>
+      </div>
+    </div>
+
+    <!-- 6. العداد التنازلي + إضافة للتقويم (الباقتان المميزة والفاخرة) -->
+    <% if (order.plan !== 'basic' && order.event_date) { %>
+      <div class="reveal-item from-left countdown-block">
+        <div class="countdown" id="countdown" data-target="<%= order.event_date %>T<%= order.event_time || '19:00' %>:00">
+          <div class="cd-cell"><span class="cd-num" id="cdDays">—</span><span class="cd-label">يوم</span></div>
+          <div class="cd-cell"><span class="cd-num" id="cdHours">—</span><span class="cd-label">ساعة</span></div>
+          <div class="cd-cell"><span class="cd-num" id="cdMinutes">—</span><span class="cd-label">دقيقة</span></div>
+          <div class="cd-cell"><span class="cd-num" id="cdSeconds">—</span><span class="cd-label">ثانية</span></div>
+        </div>
+        <div class="countdown-done" id="countdownDone" style="display:none;">🎉 حان وقت الفرح!</div>
+        <a class="calendar-btn" href="/invite/<%= order.slug %>/calendar.ics">📅 أضيفوا الموعد إلى تقويمكم</a>
+      </div>
+    <% } %>
+
+    <!-- 7. ملاحظات مختصرة -->
+    <div class="reveal-item from-right notice-line">
+      نرجو الحضور في الوقت المحدد<br>
+      يسعدنا تأكيدكم للحضور مسبقاً
+    </div>
+
+    <!-- 8. يشرفنا حضوركم -->
+    <div class="reveal-item from-left final-text">✨ يشرفنا حضوركم ✨</div>
+
+    <!-- 9. نموذج تأكيد الحضور (RSVP) -->
+    <div class="reveal-item from-right rsvp-block">
+      <hr class="rsvp-divider">
+      <% if (typeof isDemo !== 'undefined' && isDemo) { %>
+        <div class="rsvp-title">تأكيد الحضور</div>
+        <div class="rsvp-demo-note">
+          هذه معاينة تجريبية — نموذج تأكيد الحضور الحقيقي يظهر ويعمل في صفحة الدعوة الفعلية بعد الطلب.
+        </div>
+      <% } else { %>
+        <div class="rsvp-title">
+          <% if (guest && guest.name) { %>
+            <%= guest.name %>، يسعدنا تأكيد حضوركم
+          <% } else { %>
+            تأكيد الحضور
+          <% } %>
+        </div>
+        <form class="rsvp-form" id="rsvpForm" method="POST" action="/invite/<%= order.slug %>/rsvp" novalidate>
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off">
+          <% if (guest && guest.slug) { %>
+            <input type="hidden" name="guest_slug" value="<%= guest.slug %>">
+          <% } %>
+          <div class="rsvp-row">
+            <label for="rsvpName">الاسم الكامل</label>
+            <input type="text" id="rsvpName" name="name" required value="<%= (guest && guest.name) || '' %>" placeholder="اكتب اسمك هنا">
+          </div>
+          <div class="rsvp-row">
+            <label for="rsvpAttending">هل ستحضرون؟</label>
+            <select id="rsvpAttending" name="attending">
+              <option value="yes">نعم، بكل سرور</option>
+              <option value="maybe">ربما</option>
+              <option value="no">عذراً، لن نتمكن</option>
+            </select>
+          </div>
+          <div class="rsvp-row">
+            <label for="rsvpCount">عدد الحضور</label>
+            <input type="number" id="rsvpCount" name="guest_count" min="1" value="1">
+          </div>
+          <div class="rsvp-row">
+            <label for="rsvpNote">ملاحظة (اختياري)</label>
+            <textarea id="rsvpNote" name="note" rows="3" placeholder="أي ملاحظة تودون إضافتها"></textarea>
+          </div>
+          <button type="submit" class="rsvp-submit">إرسال التأكيد</button>
+          <p class="rsvp-feedback" id="rsvpFeedback" role="status"></p>
+        </form>
+      <% } %>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== فيديو البداية (إن وجد) ====== -->
+<% if (order.video_url) { %>
+<div id="introOverlay">
+  <video id="introVideo" src="<%= order.video_url %>" autoplay muted playsinline></video>
+  <button id="introSkip" type="button">تخطي ↓</button>
+</div>
+<% } %>
+
+<!-- ====== عناصر الموسيقى ====== -->
+<% if (typeof musicUrl !== 'undefined' && musicUrl) { %>
+  <audio id="bgMusic" src="<%= musicUrl %>" loop preload="auto"></audio>
+  <button id="musicToggle" type="button" aria-label="تشغيل الموسيقى">♪</button>
+<% } %>
+
+<!-- ============================================================== -->
+<!-- ======================== SCRIPTS ============================= -->
+<!-- ============================================================== -->
+
+<script>
+  var DAWAAT_DATA = <%- JSON.stringify(jsData) %>;
+</script>
+
+<!-- ====== سكربت إظهار عناصر البطاقة تدريجياً مع التمرير ======
+     كل عنصر ينزلق من اليمين أو اليسار ويظهر عند دخوله نطاق الرؤية أثناء
+     تمرير المستخدم للأسفل، بدل ظهورها كلها دفعة واحدة عند التحميل. -->
+<script>
+  function initScrollReveal() {
+    var items = document.querySelectorAll('.reveal-item');
+    if (!('IntersectionObserver' in window)) {
+      items.forEach(function(item) { item.classList.add('visible'); });
+      return;
+    }
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -30px 0px' });
+    items.forEach(function(item, i) {
+      item.style.transitionDelay = Math.min(i * 0.08, 0.6) + 's';
+      observer.observe(item);
+    });
+  }
+</script>
+
+<!-- ====== سكربت العداد التنازلي ====== -->
+<script>
+(function(){
+  var el = document.getElementById('countdown');
+  if (!el) return;
+  var target = new Date(el.dataset.target);
+  if (isNaN(target.getTime())) { el.style.display = 'none'; return; }
+
+  var doneEl = document.getElementById('countdownDone');
+  var daysEl = document.getElementById('cdDays');
+  var hoursEl = document.getElementById('cdHours');
+  var minutesEl = document.getElementById('cdMinutes');
+  var secondsEl = document.getElementById('cdSeconds');
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function tick() {
+    var diff = target.getTime() - Date.now();
+    if (diff <= 0) {
+      el.style.display = 'none';
+      doneEl.style.display = 'block';
+      clearInterval(timer);
+      return;
+    }
+    var totalSeconds = Math.floor(diff / 1000);
+    daysEl.textContent = Math.floor(totalSeconds / 86400);
+    hoursEl.textContent = pad(Math.floor((totalSeconds % 86400) / 3600));
+    minutesEl.textContent = pad(Math.floor((totalSeconds % 3600) / 60));
+    secondsEl.textContent = pad(totalSeconds % 60);
+  }
+
+  tick();
+  var timer = setInterval(tick, 1000);
+})();
+</script>
+
+<!-- ====== سكربت الفيديو الافتتاحي ====== -->
+<% if (order.video_url) { %>
+<script>
+(function(){
+  document.body.classList.add('intro-active');
+  var overlay = document.getElementById('introOverlay');
+  var video = document.getElementById('introVideo');
+  var skipBtn = document.getElementById('introSkip');
+  setTimeout(function(){ skipBtn.classList.add('show'); }, 1200);
+  var finished = false;
+  function finishIntro(){
+    if (finished) return;
+    finished = true;
+    overlay.classList.add('hide');
+    document.body.classList.remove('intro-active');
+    setTimeout(function(){ overlay.remove(); }, 950);
+    var musicToggle = document.getElementById('musicToggle');
+    if (musicToggle) musicToggle.classList.add('show');
+    initScrollReveal();
+  }
+  video.addEventListener('ended', finishIntro);
+  skipBtn.addEventListener('click', finishIntro);
+  video.addEventListener('error', finishIntro);
+  setTimeout(finishIntro, 9000);
+})();
+</script>
+<% } else { %>
+<script>
+  // إذا لم يكن هناك فيديو، نُظهر البطاقة وزر الموسيقى فوراً
+  window.addEventListener('load', function() {
+    var toggle = document.getElementById('musicToggle');
+    if (toggle) toggle.classList.add('show');
+    setTimeout(initScrollReveal, 250);
+  });
+</script>
+<% } %>
+
+<!-- ====== سكربت تأثيرات الخلفية (كانفاس) ====== -->
+<script>
+(function(){
+  var data = DAWAAT_DATA;
+  var style = data.style;
+  var canvas = document.getElementById('fx');
+  var ctx = canvas.getContext('2d');
+  var W, H, particles = [], bursts = [];
+
+  function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function rand(min, max){ return Math.random() * (max - min) + min; }
+  var CONFETTI_COLORS = ['#f4c542', '#e8747f', '#6fb8e8', '#8ce89a', '#d896e8', '#ffffff'];
+
+  function makeParticle(){
+    if (style === 'v2') {
+      return { x: rand(0, W), y: rand(-H, 0), size: rand(9, 17), vy: rand(0.5, 1.1), vx: rand(-0.3, 0.3), rot: rand(0, 360), vr: rand(-1.2, 1.2), sway: rand(0, Math.PI * 2) };
+    }
+    if (style === 'v3') {
+      return { x: rand(0, W), y: rand(-H, 0), r: rand(0.7, 2.4), vy: rand(0.18, 0.45), vx: rand(-0.06, 0.06), tw: rand(0, Math.PI * 2), big: Math.random() < 0.12 };
+    }
+    if (style === 'v4') {
+      return { x: rand(0, W), y: rand(-H, 0), w: rand(6, 11), h: rand(10, 16), vy: rand(0.7, 1.5), vx: rand(-0.5, 0.5), rot: rand(0, 360), vr: rand(-4, 4), color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)], sway: rand(0, Math.PI * 2) };
+    }
+    if (style === 'v5') {
+      return { x: rand(0, W), y: rand(0, H), r: rand(10, 34), vy: rand(0.08, 0.25), vx: rand(-0.05, 0.05), tw: rand(0, Math.PI * 2), a: rand(0.08, 0.22) };
+    }
+    if (style === 'v6') {
+      return { x: rand(0, W), y: rand(0, H), size: rand(8, 16), vy: rand(0.15, 0.4), vx: rand(-0.08, 0.08), sway: rand(0, Math.PI * 2), a: rand(0.35, 0.8) };
+    }
+    if (style === 'v7') {
+      return { x: rand(0, W), y: rand(H * 0.3, H + 40), size: rand(14, 24), vy: rand(0.12, 0.3), vx: rand(-0.04, 0.04), flicker: rand(0, Math.PI * 2), sway: rand(0, Math.PI * 2) };
+    }
+    // v1 (default)
+    return { x: rand(0, W), y: rand(0, H), r: rand(0.5, 1.8), vy: rand(0.06, 0.24), vx: rand(-0.08, 0.08), tw: rand(0, Math.PI * 2), a: rand(0.2, 0.6) };
+  }
+
+  var COUNT = style === 'v2' ? 28 : style === 'v5' ? 30 : style === 'v6' ? 22 : style === 'v7' ? 18 : 75;
+  for (var i = 0; i < COUNT; i++) particles.push(makeParticle());
+
+  function drawPetal(p){
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate((p.rot * Math.PI) / 180);
+    ctx.fillStyle = 'rgba(216, 62, 78, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.size * 0.55, p.size * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSparkle(p){
+    var flicker = (Math.sin(p.tw) + 1) / 2;
+    ctx.globalAlpha = 0.25 + flicker * 0.7;
+    ctx.fillStyle = '#f0d488';
+    if (p.big) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      var s = p.r * 3.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -s); ctx.lineTo(s * 0.22, -s * 0.22); ctx.lineTo(s, 0);
+      ctx.lineTo(s * 0.22, s * 0.22); ctx.lineTo(0, s); ctx.lineTo(-s * 0.22, s * 0.22);
+      ctx.lineTo(-s, 0); ctx.lineTo(-s * 0.22, -s * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawDust(p){
+    var flicker = (Math.sin(p.tw) + 1) / 2;
+    ctx.globalAlpha = p.a * flicker;
+    ctx.fillStyle = '#d8b565';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawConfettiPiece(x, y, w, h, rot, color, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.fillStyle = color;
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  function drawBokeh(p){
+    var flicker = (Math.sin(p.tw) + 1) / 2;
+    var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    grad.addColorStop(0, 'rgba(232, 180, 92,' + (p.a * (0.6 + flicker * 0.4)) + ')');
+    grad.addColorStop(1, 'rgba(232, 180, 92, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawHeart(x, y, size, alpha, color){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color || '#d8607a';
+    ctx.translate(x, y);
+    ctx.beginPath();
+    var s = size / 16;
+    ctx.moveTo(0, 4 * s);
+    ctx.bezierCurveTo(-8 * s, -4 * s, -16 * s, 4 * s, 0, 14 * s);
+    ctx.bezierCurveTo(16 * s, 4 * s, 8 * s, -4 * s, 0, 4 * s);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLantern(p){
+    var flicker = (Math.sin(p.flicker) + 1) / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.5 + flicker * 0.4;
+    ctx.fillStyle = '#e0793f';
+    ctx.shadowColor = '#f4c542';
+    ctx.shadowBlur = 10 + flicker * 8;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size * 1.2, p.size * 0.3);
+    } else {
+      ctx.rect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size * 1.2);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function tick(){
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(function(p) {
+      if (style === 'v2') {
+        p.y += p.vy; p.sway += 0.02; p.x += p.vx + Math.sin(p.sway) * 0.35; p.rot += p.vr;
+        drawPetal(p);
+        if (p.y > H + 20) { p.y = -20; p.x = rand(0, W); }
+      } else if (style === 'v3') {
+        p.tw += 0.06; p.y += p.vy; p.x += p.vx;
+        drawSparkle(p);
+        if (p.y > H + 10) { p.y = -10; p.x = rand(0, W); }
+      } else if (style === 'v4') {
+        p.y += p.vy; p.sway += 0.03; p.x += p.vx + Math.sin(p.sway) * 0.4; p.rot += p.vr;
+        drawConfettiPiece(p.x, p.y, p.w, p.h, p.rot, p.color, 0.9);
+        if (p.y > H + 20) { p.y = -20; p.x = rand(0, W); }
+      } else if (style === 'v5') {
+        p.tw += 0.02; p.y -= p.vy; p.x += p.vx;
+        drawBokeh(p);
+        if (p.y < -p.r) p.y = H + p.r;
+      } else if (style === 'v6') {
+        p.sway += 0.02; p.y -= p.vy; p.x += p.vx + Math.sin(p.sway) * 0.3;
+        drawHeart(p.x, p.y, p.size, p.a, '#d8607a');
+        if (p.y < -20) { p.y = H + 20; p.x = rand(0, W); }
+      } else if (style === 'v7') {
+        p.flicker += 0.05; p.sway += 0.015; p.y -= p.vy; p.x += p.vx + Math.sin(p.sway) * 0.25;
+        drawLantern(p);
+        if (p.y < -30) { p.y = H + 30; p.x = rand(0, W); }
+      } else {
+        p.tw += 0.04; p.y -= p.vy; p.x += p.vx;
+        drawDust(p);
+        if (p.y < -10) p.y = H + 10;
+      }
+    });
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    if (bursts.length) {
+      bursts = bursts.filter(function(b) { return b.life < b.maxLife; });
+      bursts.forEach(function(b) {
+        b.life += 1; b.vy += 0.12; b.x += b.vx; b.y += b.vy; b.rot += b.vr;
+        var alpha = Math.max(0, 1 - b.life / b.maxLife);
+        drawConfettiPiece(b.x, b.y, b.w, b.h, b.rot, b.color, alpha);
+      });
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+
+  window.__dawaatConfettiBurst = function(originX, originY){
+    var ox = originX || W / 2;
+    var oy = originY || H / 2;
+    for (var i = 0; i < 90; i++) {
+      var angle = rand(0, Math.PI * 2);
+      var speed = rand(3, 9);
+      bursts.push({
+        x: ox, y: oy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 4,
+        w: rand(5, 9), h: rand(8, 13),
+        rot: rand(0, 360), vr: rand(-8, 8),
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        life: 0, maxLife: rand(50, 80),
+      });
+    }
+  };
+})();
+</script>
+
+<!-- ====== سكربت الموسيقى (تشغيل تلقائي + زر يدوي) ====== -->
+<% if (typeof musicUrl !== 'undefined' && musicUrl) { %>
+<script>
+(function(){
+  var audio = document.getElementById('bgMusic');
+  var toggle = document.getElementById('musicToggle');
+  if (!audio || !toggle) return;
+  var playing = false;
+
+  function tryPlay() {
+    audio.play().then(function() {
+      playing = true;
+      toggle.textContent = '❚❚';
+      toggle.classList.add('playing');
+      toggle.classList.add('show');
+      fadeVolumeIn();
+    }).catch(function(err) {
+      toggle.classList.add('show');
+      toggle.textContent = '♪';
+    });
+  }
+
+  function fadeVolumeIn(){
+    audio.volume = 0;
+    var v = 0;
+    var step = setInterval(function(){
+      v += 0.06;
+      audio.volume = Math.min(v, 0.55);
+      if (v >= 0.55) clearInterval(step);
+    }, 120);
+  }
+
+  if (document.readyState === 'complete') { setTimeout(tryPlay, 800); }
+  else { window.addEventListener('load', function() { setTimeout(tryPlay, 800); }); }
+
+  toggle.addEventListener('click', function(){
+    if (!playing) {
+      audio.play().then(function(){
+        playing = true;
+        toggle.textContent = '❚❚';
+        toggle.classList.add('playing');
+        fadeVolumeIn();
+      }).catch(function(){ alert('الرجاء النقر مرة أخرى لتشغيل الموسيقى.'); });
+    } else {
+      audio.pause();
+      playing = false;
+      toggle.textContent = '♪';
+      toggle.classList.remove('playing');
+    }
+  });
+
+  audio.addEventListener('ended', function(){
+    if (playing) { playing = false; toggle.textContent = '♪'; toggle.classList.remove('playing'); }
+  });
+})();
+</script>
+<% } %>
+
+<!-- ====== سكربت نموذج تأكيد الحضور (تحسين تدريجي عبر Ajax) ====== -->
+<script>
+(function(){
+  var form = document.getElementById('rsvpForm');
+  if (!form) return;
+  var feedback = document.getElementById('rsvpFeedback');
+  var submitBtn = form.querySelector('.rsvp-submit');
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    feedback.textContent = '';
+    feedback.className = 'rsvp-feedback';
+    submitBtn.disabled = true;
+
+    fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(new FormData(form)).toString(),
+    })
+      .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+      .then(function(result){
+        submitBtn.disabled = false;
+        if (result.ok && result.data.ok) {
+          feedback.textContent = '✅ تم إرسال ردكم بنجاح، شكراً لكم!';
+          feedback.className = 'rsvp-feedback ok';
+          form.reset();
+        } else {
+          feedback.textContent = (result.data && result.data.error) || 'حدث خطأ، يرجى المحاولة مرة أخرى.';
+          feedback.className = 'rsvp-feedback err';
+        }
+      })
+      .catch(function(){
+        submitBtn.disabled = false;
+        feedback.textContent = 'تعذر الاتصال بالخادم، تحقق من الإنترنت وحاول مرة أخرى.';
+        feedback.className = 'rsvp-feedback err';
+      });
+  });
+})();
+</script>
+
+<!-- ====== سكربت الملصقات العائمة الخلفية (من إعدادات الموقع العامة) ====== -->
+<script>
+(function(){
+  var data = DAWAAT_DATA;
+  var uploaded = data.bgStickers || [];
+
+  // Background stickers only appear when actually configured (order-specific
+  // uploads, or the site-wide gallery on demo/style-preview pages) — no
+  // generic fallback shapes when none are set.
+  var sources = uploaded;
+  if (!sources.length) return;
+
+  // ملصق واحد بهيء يظهر ويتلاشى ببطء في كل مرة (مثل الفيديو المرجعي)، بدل
+  // عدة ملصقات تنبثق بسرعة.
+  var MAX_CONCURRENT = 1;
+  var active = 0;
+
+  function spawnSticker(){
+    if (active >= MAX_CONCURRENT) return;
+    active++;
+    var img = document.createElement('img');
+    img.src = sources[Math.floor(Math.random() * sources.length)];
+    img.className = 'bg-sticker';
+    img.alt = '';
+    var size = 50 + Math.random() * 44;
+    img.style.width = size + 'px';
+    img.style.height = size + 'px';
+    img.style.left = (8 + Math.random() * 78) + 'vw';
+    img.style.top = (12 + Math.random() * 68) + 'vh';
+    img.style.transform = 'translateY(0) rotate(0deg)';
+    document.body.appendChild(img);
+    requestAnimationFrame(function(){
+      img.classList.add('show');
+      img.style.transform = 'translateY(-' + (14 + Math.random() * 18) + 'px) rotate(' + (Math.random() * 10 - 5) + 'deg)';
+    });
+    setTimeout(function(){
+      img.classList.remove('show');
+      setTimeout(function(){ img.remove(); active--; }, 4500);
+    }, 9000 + Math.random() * 3000);
+  }
+
+  setInterval(spawnSticker, 6500);
+  setTimeout(spawnSticker, 900);
+})();
+</script>
+
+</body>
+</html>

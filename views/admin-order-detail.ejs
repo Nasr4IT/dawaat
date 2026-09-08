@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= order.groom_name %> و<%= order.bride_name %> — دعوات</title>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">دعوات — الإدارة</div>
+    <a href="/admin" class="btn btn-ghost btn-sm">رجوع للوحة</a>
+  </div>
+  <div class="wrap">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h1><%= order.groom_name %> و<%= order.bride_name %></h1>
+      <span class="badge badge-<%= order.status %>"><%= STATUS_LABELS[order.status] %></span>
+    </div>
+
+    <!-- Shareable link + status controls -->
+    <div class="card">
+      <h2>رابط الدعوة</h2>
+      <div class="link-box">
+        <span id="inviteLink"><%= BASE_URL %>/invite/<%= order.slug %></span>
+        <button class="btn btn-ghost btn-sm" onclick="copyLink()" type="button">نسخ</button>
+        <a href="/invite/<%= order.slug %>" target="_blank" class="btn btn-ghost btn-sm">معاينة</a>
+      </div>
+
+      <h2 style="margin-top:20px;">حالة الطلب</h2>
+      <form method="POST" action="/admin/orders/<%= order.id %>/status" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <select name="status">
+          <% ['lead','confirmed','paid','published'].forEach(s => { %>
+            <option value="<%= s %>" <%= order.status === s ? 'selected' : '' %>><%= STATUS_LABELS[s] %></option>
+          <% }) %>
+        </select>
+        <button class="btn btn-sm" type="submit">تحديث الحالة</button>
+        <span class="muted">"منشور" هي الحالة التي تجعل الدعوة جاهزة لإرسالها للضيوف</span>
+      </form>
+    </div>
+
+    <!-- Edit details -->
+    <div class="card">
+      <h2>تفاصيل الدعوة</h2>
+      <form method="POST" action="/admin/orders/<%= order.id %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+          <div class="form-group"><label>اسم العريس</label><input type="text" name="groom_name" value="<%= order.groom_name %>" required></div>
+          <div class="form-group"><label>اسم العروس</label><input type="text" name="bride_name" value="<%= order.bride_name %>" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>تاريخ الحفل</label><input type="date" name="event_date" value="<%= order.event_date || '' %>"></div>
+          <div class="form-group"><label>وقت الحفل</label><input type="time" name="event_time" value="<%= order.event_time || '' %>"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>مكان الحفل</label><input type="text" name="venue" value="<%= order.venue || '' %>"></div>
+          <div class="form-group"><label>رقم الهاتف</label><input type="text" name="phone" value="<%= order.phone || '' %>"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>الباقة</label>
+            <select name="plan">
+              <% ['basic','featured','luxury'].forEach(p => { %>
+                <option value="<%= p %>" <%= order.plan === p ? 'selected' : '' %>><%= PLAN_LABELS[p] %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>نمط التصميم</label>
+            <select name="style">
+              <option value="v1" <%= order.style === 'v1' ? 'selected' : '' %>>البوابات الذهبية</option>
+              <option value="v2" <%= order.style === 'v2' ? 'selected' : '' %>>الورد المتطاير</option>
+              <option value="v3" <%= order.style === 'v3' ? 'selected' : '' %>>الخط العربي</option>
+              <option value="v4" <%= order.style === 'v4' ? 'selected' : '' %>>قصاصات الاحتفال (تخرج)</option>
+              <option value="v5" <%= order.style === 'v5' ? 'selected' : '' %>>أضواء دافئة</option>
+              <option value="v6" <%= order.style === 'v6' ? 'selected' : '' %>>قلوب متطايرة</option>
+              <option value="v7" <%= order.style === 'v7' ? 'selected' : '' %>>فوانيس معلّقة</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>ملاحظات</label>
+          <textarea name="note"><%= order.note || '' %></textarea>
+        </div>
+        <input type="hidden" name="video_url" value="<%= order.video_url || '' %>">
+        <button class="btn" type="submit">حفظ التعديلات</button>
+      </form>
+    </div>
+
+    <!-- Opening video -->
+    <div class="card">
+      <h2>الفيديو الافتتاحي</h2>
+      <% if (typeof videoUploadError !== 'undefined' && videoUploadError) { %>
+        <div class="error"><%= videoUploadError %></div>
+      <% } %>
+      <% if (order.video_url) { %>
+        <p class="muted" style="margin-bottom:10px;">الفيديو الحالي: <span style="word-break:break-all;"><%= order.video_url %></span></p>
+        <video src="<%= order.video_url %>" controls playsinline style="width:100%; max-width:280px; margin-bottom:16px; border:1px solid var(--line);"></video>
+      <% } else { %>
+        <p class="muted" style="margin-bottom:16px;">لم يُضف فيديو بعد — سيتم عرض الدعوة مباشرة بدون مقدمة فيديو.</p>
+      <% } %>
+
+      <form method="POST" action="/admin/orders/<%= order.id %>/video" enctype="multipart/form-data" style="margin-bottom:16px;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>رفع ملف فيديو مباشرة (الحد الأقصى 80 ميجابايت)</label>
+          <input type="file" name="video_file" accept="video/*" required>
+        </div>
+        <button class="btn btn-sm" type="submit">رفع الفيديو</button>
+      </form>
+
+      <form method="POST" action="/admin/orders/<%= order.id %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="groom_name" value="<%= order.groom_name %>">
+        <input type="hidden" name="bride_name" value="<%= order.bride_name %>">
+        <input type="hidden" name="event_date" value="<%= order.event_date || '' %>">
+        <input type="hidden" name="event_time" value="<%= order.event_time || '' %>">
+        <input type="hidden" name="venue" value="<%= order.venue || '' %>">
+        <input type="hidden" name="phone" value="<%= order.phone || '' %>">
+        <input type="hidden" name="plan" value="<%= order.plan %>">
+        <input type="hidden" name="style" value="<%= order.style %>">
+        <input type="hidden" name="note" value="<%= order.note || '' %>">
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>أو استخدام رابط فيديو خارجي بدلاً من الرفع</label>
+          <input type="text" name="video_url" value="<%= order.video_url || '' %>" placeholder="https://...">
+        </div>
+        <button class="btn btn-ghost btn-sm" type="submit">حفظ الرابط</button>
+      </form>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- 🎵 الموسيقى والملصقات (مع رفع الملفات)                         -->
+    <!-- ============================================================== -->
+    <div class="card" id="music-stickers-card">
+      <h2>🎵 الموسيقى والملصقات</h2>
+
+      <!-- ====== رفع ملف موسيقى ====== -->
+      <div style="margin-bottom:20px;">
+        <h3 style="font-size:1rem; font-weight:500; margin-bottom:6px;">🎶 رفع موسيقى خلفية</h3>
+        
+        <!-- رفع ملف -->
+        <form method="POST" action="/admin/orders/<%= order.id %>/music" enctype="multipart/form-data" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="form-group" style="flex:1; min-width:180px; margin-bottom:0;">
+            <label>رفع ملف MP3 (الحد الأقصى 15 ميجابايت)</label>
+            <input type="file" name="music_file" accept="audio/*" required>
+          </div>
+          <button class="btn btn-sm" type="submit">📤 رفع الموسيقى</button>
+        </form>
+
+        <!-- رابط خارجي (خيار ثانوي) -->
+        <form method="POST" action="/admin/orders/<%= order.id %>/music-url" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="text" id="musicUrlInput" name="music_url" value="<%= order.music_url || '' %>" placeholder="أو ألصق رابط MP3 هنا ..." style="flex:1; min-width:200px; direction:ltr;">
+          <button class="btn btn-sm" type="submit">💾 حفظ الرابط</button>
+          <button class="btn btn-ghost btn-sm" onclick="previewMusic()" type="button">▶️ معاينة</button>
+        </form>
+
+        <!-- حالة الموسيقى الحالية -->
+        <div style="margin-top:8px;">
+          <% if (order.music_url) { %>
+            <span class="muted" style="font-size:0.85rem; color:#7a9e7a;">✅ موسيقى محملة: <span style="word-break:break-all;"><%= order.music_url %></span></span>
+            <br>
+            <audio src="<%= order.music_url %>" controls playsinline style="width:100%; max-width:260px; margin-top:6px;"></audio>
+            <br>
+            <form method="POST" action="/admin/orders/<%= order.id %>/music/delete" onsubmit="return confirm('هل تريد حذف الموسيقى؟');" style="margin-top:6px;">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-danger btn-sm" type="submit">🗑️ حذف الموسيقى</button>
+            </form>
+          <% } else { %>
+            <span class="muted" style="font-size:0.85rem;">⚪ لم يتم تحميل أي مقطع موسيقي بعد.</span>
+          <% } %>
+        </div>
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+
+      <!-- ====== رفع ملصقات مخصصة ====== -->
+      <div style="margin-bottom:16px;">
+        <h3 style="font-size:1rem; font-weight:500; margin-bottom:6px;">✨ رفع ملصقات مخصصة (زخارف عائمة)</h3>
+        
+        <!-- رفع ملفات الملصقات -->
+        <form method="POST" action="/admin/orders/<%= order.id %>/stickers" enctype="multipart/form-data" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="form-group" style="flex:1; min-width:180px; margin-bottom:0;">
+            <label>رفع صور (PNG/SVG - ستظهر كزخارف عائمة بدلاً من القلوب)</label>
+            <input type="file" name="sticker_files" accept="image/*" multiple>
+            <p class="muted" style="font-size:0.75rem; margin-top:2px;">يمكنك اختيار عدة صور دفعة واحدة (سيتم عرضها عشوائياً).</p>
+          </div>
+          <button class="btn btn-sm" type="submit">📤 رفع الملصقات</button>
+        </form>
+
+                <!-- عرض الملصقات المرفوعة حالياً -->
+        <% 
+          let stickers = [];
+          if (order.sticker_urls) {
+            try { 
+              stickers = JSON.parse(order.sticker_urls); 
+            } catch(e) { 
+              stickers = []; 
+            }
+          }
+        %>
+        <% if (stickers.length > 0) { %>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; background:#fcfaf8; padding:10px; border-radius:8px; border:1px solid var(--line);">
+            <span style="font-size:0.85rem; color:#666; width:100%;">الملصقات المرفوعة (<%= stickers.length %>):</span>
+            <% stickers.forEach(function(url, i) { %>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                <img src="<%= url %>" alt="ملصق" style="width:50px; height:50px; object-fit:contain; border-radius:8px; border:1px solid #eee; background:white; padding:4px;">
+                <form method="POST" action="/admin/orders/<%= order.id %>/stickers/<%= i %>/delete" onsubmit="return confirm('هل تريد حذف هذا الملصق؟');">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm" type="submit" style="padding:2px 8px; font-size:0.75rem;">🗑️</button>
+                </form>
+              </div>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <span class="muted" style="font-size:0.85rem; display:block; margin-top:8px;">⚪ لم يتم رفع أي ملصق مخصص لهذا الطلب، لذا لن تظهر أي ملصقات خلفية في دعوته.</span>
+        <% } %>
+
+      <!-- ====== عناصر مخفية للمعاينة ====== -->
+      <audio id="previewAudio" style="display:none;"></audio>
+      </div>
+    </div>
+
+    <!-- Bride & groom individual photos — shown as a faded background
+         watermark behind the invitation card (one on each side). -->
+    <div class="card">
+      <h2>صورة العروس والعريس (خلفية البطاقة)</h2>
+      <p class="muted" style="margin-bottom:16px;">تظهر صورتا العروس والعريس باهتتين في خلفية بطاقة الدعوة. إن لم تُرفعا، تُستخدم الصورة المشتركة أدناه بدلاً منهما، وإن لم تُرفع هي الأخرى فلا تظهر خلفية.</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <h3 style="font-size:0.95rem; font-weight:500; margin-bottom:8px;">صورة العروس</h3>
+          <% if (typeof bridePhotoUploadError !== 'undefined' && bridePhotoUploadError) { %>
+            <div class="error"><%= bridePhotoUploadError %></div>
+          <% } %>
+          <% if (order.bride_photo_url) { %>
+            <img src="<%= order.bride_photo_url %>" alt="صورة العروس" style="width:100px; height:100px; object-fit:cover; border-radius:50%; border:1px solid var(--line); margin-bottom:12px; display:block;">
+          <% } else { %>
+            <p class="muted" style="margin-bottom:12px; font-size:12px;">لم تُرفع بعد.</p>
+          <% } %>
+          <form method="POST" action="/admin/orders/<%= order.id %>/bride-photo" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="file" name="photo_file" accept="image/*" required style="margin-bottom:8px;">
+            <button class="btn btn-sm" type="submit">رفع صورة العروس</button>
+          </form>
+        </div>
+        <div class="form-group">
+          <h3 style="font-size:0.95rem; font-weight:500; margin-bottom:8px;">صورة العريس</h3>
+          <% if (typeof groomPhotoUploadError !== 'undefined' && groomPhotoUploadError) { %>
+            <div class="error"><%= groomPhotoUploadError %></div>
+          <% } %>
+          <% if (order.groom_photo_url) { %>
+            <img src="<%= order.groom_photo_url %>" alt="صورة العريس" style="width:100px; height:100px; object-fit:cover; border-radius:50%; border:1px solid var(--line); margin-bottom:12px; display:block;">
+          <% } else { %>
+            <p class="muted" style="margin-bottom:12px; font-size:12px;">لم تُرفع بعد.</p>
+          <% } %>
+          <form method="POST" action="/admin/orders/<%= order.id %>/groom-photo" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="file" name="photo_file" accept="image/*" required style="margin-bottom:8px;">
+            <button class="btn btn-sm" type="submit">رفع صورة العريس</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared couple photo (fallback) -->
+    <div class="card">
+      <h2>الصورة المشتركة (احتياطية)</h2>
+      <% if (typeof photoUploadError !== 'undefined' && photoUploadError) { %>
+        <div class="error"><%= photoUploadError %></div>
+      <% } %>
+      <% if (order.photo_url) { %>
+        <img src="<%= order.photo_url %>" alt="صورة العروسين" style="width:140px; height:140px; object-fit:cover; border-radius:50%; border:1px solid var(--line); margin-bottom:16px; display:block;">
+      <% } else { %>
+        <p class="muted" style="margin-bottom:16px;">لم تُرفع صورة.</p>
+      <% } %>
+      <form method="POST" action="/admin/orders/<%= order.id %>/photo" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>رفع صورة (الحد الأقصى 8 ميجابايت)</label>
+          <input type="file" name="photo_file" accept="image/*" required>
+        </div>
+        <button class="btn btn-sm" type="submit">رفع الصورة</button>
+      </form>
+    </div>
+
+    <!-- Guest-specific links -->
+    <div class="card">
+      <h2>روابط مخصصة بأسماء الضيوف (الباقة الفاخرة)</h2>
+      <form method="POST" action="/admin/orders/<%= order.id %>/guests" style="display:flex; gap:10px; margin-bottom:16px;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="text" name="name" placeholder="اسم الضيف" required style="flex:1;">
+        <button class="btn btn-sm" type="submit">إضافة</button>
+      </form>
+      <% if (guests.length === 0) { %>
+        <div class="empty">لا توجد روابط ضيوف بعد</div>
+      <% } else { %>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>الضيف</th><th>الرابط</th><th></th></tr></thead>
+          <tbody>
+            <% guests.forEach(g => { %>
+              <tr>
+                <td><%= g.name %></td>
+                <td class="muted"><%= BASE_URL %>/invite/<%= order.slug %>/<%= g.slug %></td>
+                <td style="display:flex; gap:6px;">
+                  <a href="/invite/<%= order.slug %>/<%= g.slug %>" target="_blank" class="btn btn-ghost btn-sm">فتح</a>
+                  <form method="POST" action="/admin/orders/<%= order.id %>/guests/<%= g.id %>/delete">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- RSVPs -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin-bottom:0;">تأكيدات الحضور (<%= rsvps.length %>)</h2>
+        <a href="/admin/orders/<%= order.id %>/rsvps.csv" class="btn btn-ghost btn-sm">تصدير CSV</a>
+      </div>
+      <div style="height:14px;"></div>
+      <% if (rsvps.length === 0) { %>
+        <div class="empty">لا توجد تأكيدات حضور بعد</div>
+      <% } else { %>
+        <%
+          const rsvpNameCounts = {};
+          rsvps.forEach((r) => {
+            const key = r.name.trim().toLowerCase();
+            rsvpNameCounts[key] = (rsvpNameCounts[key] || 0) + 1;
+          });
+        %>
+        <% if (Object.values(rsvpNameCounts).some((n) => n > 1)) { %>
+          <p class="muted" style="font-size:0.8rem; margin-bottom:10px;">⚠️ بعض الأسماء مكررة (مُعلّمة بالأصفر أدناه) — راجعها واحذف المكرر منها إن لزم.</p>
+        <% } %>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>الاسم</th><th>الحضور</th><th>عدد الأشخاص</th><th>ملاحظة</th><th>التاريخ</th><th></th></tr></thead>
+          <tbody>
+            <% rsvps.forEach(r => { %>
+              <% const isDuplicate = rsvpNameCounts[r.name.trim().toLowerCase()] > 1; %>
+              <tr class="<%= isDuplicate ? 'rsvp-duplicate' : '' %>">
+                <td><%= r.name %><% if (isDuplicate) { %> <span title="اسم مكرر">⚠️</span><% } %></td>
+                <td><%= r.attending === 'yes' ? 'حاضر' : r.attending === 'no' ? 'غير حاضر' : 'ربما' %></td>
+                <td><%= r.guest_count %></td>
+                <td class="muted"><%= r.note || '—' %></td>
+                <td class="muted"><%= r.created_at %></td>
+                <td>
+                  <form method="POST" action="/admin/orders/<%= order.id %>/rsvps/<%= r.id %>/delete" onsubmit="return confirm('هل تريد حذف تأكيد الحضور هذا؟');">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } %>
+    </div>
+
+    <form method="POST" action="/admin/orders/<%= order.id %>/delete" onsubmit="return confirm('هل تريد حذف هذا الطلب نهائياً؟');">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-danger btn-sm" type="submit">حذف الطلب</button>
+    </form>
+  </div>
+
+  <script>
+    function copyLink(){
+      const text = document.getElementById('inviteLink').textContent;
+      navigator.clipboard.writeText(text);
+    }
+
+    // ==============================================================
+    // Music URL client-side preview (saving itself is a real form POST
+    // to /admin/orders/:id/music-url, handled server-side).
+    // ==============================================================
+    (function() {
+      'use strict';
+
+      const musicInput = document.getElementById('musicUrlInput');
+      const previewAudio = document.getElementById('previewAudio');
+
+      let isPreviewPlaying = false;
+      window.previewMusic = function() {
+        const url = musicInput.value.trim();
+        if (!url) {
+          alert('الرجاء إدخال رابط MP3 أو رفع ملف أولاً.');
+          return;
+        }
+
+        if (isPreviewPlaying) {
+          previewAudio.pause();
+          previewAudio.currentTime = 0;
+          isPreviewPlaying = false;
+          document.querySelector('#music-stickers-card .btn-ghost').textContent = '▶️ معاينة';
+          return;
+        }
+
+        previewAudio.src = url;
+        previewAudio.play()
+          .then(() => {
+            isPreviewPlaying = true;
+            document.querySelector('#music-stickers-card .btn-ghost').textContent = '⏹️ إيقاف';
+          })
+          .catch((err) => {
+            alert('تعذر تشغيل الصوت. تأكد من أن الرابط صحيح (قد يكون هناك مشكلة CORS).');
+            console.warn(err);
+          });
+      };
+
+      previewAudio.addEventListener('ended', function() {
+        isPreviewPlaying = false;
+        document.querySelector('#music-stickers-card .btn-ghost').textContent = '▶️ معاينة';
+      });
+
+    })();
+  </script>
+</body>
+</html>

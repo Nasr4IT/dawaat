@@ -1,0 +1,102 @@
+:root{
+  --bg:#faf7f0; --surface:#ffffff; --ink:#2a2115; --muted:#8a7a5c;
+  --gold:#b8892b; --gold-deep:#8a6423; --line:#e6ddc8;
+  --ok:#2f7a4f; --warn:#b8892b; --danger:#b5121b;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Tajawal', Tahoma, Arial, sans-serif; direction:rtl;
+}
+a{ color:inherit; }
+.wrap{ max-width:1040px; margin:0 auto; padding:28px 20px 60px; }
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--line); background:var(--surface);
+}
+.topbar .brand{ font-family:'Aref Ruqaa', serif; font-size:20px; color:var(--gold-deep); }
+.topbar form{ margin:0; }
+.btn{
+  display:inline-block; padding:9px 18px; font-size:13px; border:1px solid var(--gold);
+  background:var(--gold); color:#fff; cursor:pointer; text-decoration:none; border-radius:2px;
+}
+.btn:hover{ background:var(--gold-deep); }
+.btn-ghost{ background:transparent; color:var(--gold-deep); }
+.btn-ghost:hover{ background:#fff5e0; }
+.btn-danger{ background:var(--danger); border-color:var(--danger); }
+.btn-sm{ padding:6px 12px; font-size:12px; }
+
+h1{ font-family:'Aref Ruqaa', serif; font-size:26px; margin:0 0 20px; }
+h2{ font-family:'Aref Ruqaa', serif; font-size:19px; margin:0 0 14px; }
+
+.card{ background:var(--surface); border:1px solid var(--line); padding:22px; margin-bottom:20px; border-radius:3px; }
+
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+th, td{ padding:10px 8px; text-align:right; border-bottom:1px solid var(--line); }
+th{ color:var(--muted); font-weight:500; font-size:12px; }
+tr:hover td{ background:#fffaf0; }
+
+.badge{ display:inline-block; padding:3px 10px; font-size:11px; border-radius:20px; }
+.badge-lead{ background:#eee; color:#555; }
+.badge-confirmed{ background:#e6f0ff; color:#2a5db0; }
+.badge-paid{ background:#fff2d6; color:var(--gold-deep); }
+.badge-published{ background:#e6f4ea; color:var(--ok); }
+
+.form-row{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.form-group{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:6px; }
+label{ font-size:12px; color:var(--muted); }
+input, select, textarea{
+  padding:10px 12px; border:1px solid var(--line); font-family:inherit; font-size:14px;
+  background:#fff; border-radius:2px;
+}
+textarea{ resize:vertical; min-height:70px; }
+
+.login-box{ max-width:340px; margin:80px auto; }
+.error{ color:var(--danger); font-size:13px; margin-bottom:10px; }
+.muted{ color:var(--muted); font-size:12px; }
+.link-box{
+  display:flex; gap:8px; align-items:center; background:#fffaf0; border:1px solid var(--line);
+  padding:8px 12px; font-size:12px; word-break:break-all;
+}
+.empty{ color:var(--muted); text-align:center; padding:30px 0; font-size:13px; }
+.table-wrap{ overflow-x:auto; }
+
+.new-badge{
+  display:inline-block; background:var(--danger); color:#fff; font-size:11px;
+  padding:2px 9px; border-radius:20px; margin-inline-start:8px; vertical-align:middle;
+}
+tr.row-new td{ background:#fffaf0; font-weight:500; }
+tr.row-new:hover td{ background:#fff3d9; }
+tr.rsvp-duplicate td{ background:#fff8e1; }
+tr.rsvp-duplicate:hover td{ background:#ffefc2; }
+.new-dot{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--danger); margin-inline-start:4px; vertical-align:middle;
+}
+
+.filter-bar{
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:18px 0;
+}
+.filter-bar input[type="text"]{ flex:1; min-width:200px; }
+.filter-bar select{ min-width:140px; }
+
+.pagination{
+  display:flex; gap:14px; align-items:center; justify-content:center;
+  margin-top:18px; font-size:13px;
+}
+.pagination .disabled{ opacity:0.4; pointer-events:none; }
+
+@media (max-width: 640px){
+  .filter-bar{ flex-direction:column; align-items:stretch; }
+  .filter-bar input[type="text"], .filter-bar select{ min-width:0; }
+}
+
+@media (max-width: 640px){
+  .topbar{ flex-wrap:wrap; row-gap:10px; padding:14px 16px; }
+  .wrap{ padding:20px 14px 40px; }
+  h1{ font-size:22px; }
+  .card{ padding:16px; }
+  table{ font-size:12px; }
+  th, td{ padding:8px 6px; }
+  .login-box{ margin:40px auto; max-width:none; }
+}

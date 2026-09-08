@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دخول الإدارة — دعوات</title>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="login-box card">
+    <h1 style="text-align:center;">دعوات</h1>
+    <p class="muted" style="text-align:center; margin-bottom:20px;">لوحة تحكم الإدارة</p>
+    <% if (error) { %><div class="error"><%= error %></div><% } %>
+    <form method="POST" action="/admin/login">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>اسم المستخدم</label>
+        <input type="text" name="username" required autofocus>
+      </div>
+      <div class="form-group" style="margin-bottom:18px;">
+        <label>كلمة المرور</label>
+        <input type="password" name="password" required>
+      </div>
+      <button class="btn" style="width:100%;" type="submit">دخول</button>
+    </form>
+  </div>
+</body>
+</html>
