@@ -78,11 +78,16 @@
   <%- cssVars %>
 
   * { box-sizing:border-box; margin:0; padding:0; }
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
   body {
     background: var(--bg);
     color: var(--ink);
     font-family: 'Tajawal', sans-serif;
     overflow-x: hidden;
+    max-width: 100%;
     min-height: 100vh;
   }
 
@@ -110,7 +115,9 @@
   .corner-sticker.bride { position: fixed; bottom: 20px; right: 20px; width: 100px; opacity: 0.7; z-index: 10; }
   .corner-sticker.groom { position: fixed; bottom: 20px; left: 20px; width: 100px; opacity: 0.7; z-index: 10; }
   @media (max-width: 600px) {
-    .corner-sticker.bride, .corner-sticker.groom { width: 60px; bottom: 10px; }
+    /* على الجوال المساحة ضيقة وهذه الملصقات تتداخل مع زر الموسيقى وبطاقة
+       الدعوة، لذا نخفيها بدل تصغيرها فقط */
+    .corner-sticker.bride, .corner-sticker.groom { display: none; }
   }
 
   /* ====== زر تشغيل الموسيقى ====== */
@@ -170,6 +177,95 @@
   #introSkip.show { opacity: 1; }
   body.intro-active { overflow: hidden; height: 100vh; }
 
+  /* ====== شاشة افتتاحية: أسماء العروسين والتاريخ بشكل كبير قبل التمرير
+     لمشاهدة تفاصيل الدعوة — تعطي التمرير معنى بدل الهبوط مباشرة على
+     البطاقة ====== */
+  .hero-section {
+    position: relative;
+    z-index: 3;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  .hero-names {
+    font-family: var(--heading-font);
+    font-size: clamp(2.2rem, 10vw, 3.6rem);
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+  .hero-names .amp { color: var(--accent); font-size: 0.75em; margin: 0 10px; }
+  .hero-date {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.1rem, 4vw, 1.5rem);
+    color: var(--accent);
+  }
+  .hero-scroll-hint {
+    position: absolute;
+    bottom: 34px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .hero-scroll-hint .arrow {
+    font-size: 16px;
+    color: var(--accent);
+    animation: heroScrollBounce 1.8s ease-in-out infinite;
+  }
+  @keyframes heroScrollBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(8px); }
+  }
+
+  /* ====== شاشة ختامية: شكر وتحية ختامية بعد نموذج تأكيد الحضور، كي لا
+     تكون البطاقة/النموذج آخر ما يراه الضيف ====== */
+  .closing-section {
+    position: relative;
+    z-index: 3;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 40px 24px;
+    text-align: center;
+  }
+  .closing-emblem {
+    font-size: 1.8rem;
+    color: var(--accent);
+  }
+  .closing-title {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.4rem, 5vw, 1.9rem);
+    color: var(--accent);
+  }
+  .closing-text {
+    font-family: 'Tajawal', sans-serif;
+    font-size: clamp(0.95rem, 3vw, 1.05rem);
+    color: var(--muted);
+    line-height: 1.9;
+    max-width: 420px;
+  }
+  .closing-names {
+    font-family: var(--heading-font);
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    font-weight: 700;
+    color: var(--ink);
+    margin-top: 8px;
+  }
+  .closing-names .amp { color: var(--accent); font-size: 0.75em; margin: 0 8px; }
+
   /* ====================================================================
      بطاقة الدعوة — كل المحتوى داخل بطاقة واحدة ثابتة، بلا تمرير بين
      شاشات كاملة. العناصر تظهر بترتيب زمني عند التحميل (أو بعد انتهاء
@@ -190,7 +286,11 @@
     position: relative;
     width: 100%;
     max-width: 460px;
-    background: var(--surface);
+    /* شبه شفافة كي تظهر الزهور المتساقطة والملصقات المتلألئة من خلفها
+       بدل أن تحجبها البطاقة تماماً */
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.18);
@@ -224,8 +324,8 @@
      عند التحميل. */
   .reveal-item {
     opacity: 0;
-    transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-                transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 1.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 1.7s cubic-bezier(0.22, 1, 0.36, 1);
     margin: 14px 0;
   }
   .reveal-item.from-right { transform: translateX(52px); }
@@ -425,14 +525,27 @@
   }
   .demo-banner a:hover { background: rgba(255,255,255,0.32); }
 
-  /* ====== تحسينات الجوال ====== */
+  /* ====== تحسينات الجوال ======
+     نكبّر الخطوط ونزيد المسافات بين العناصر على الجوال، بدل الاعتماد على
+     أصغر حد في clamp(): على الشاشات الصغيرة كانت البطاقة بأكملها تظهر ضمن
+     الشاشة الأولى فلا يشعر المستخدم بحركة الظهور التدريجي عند التمرير. */
   @media (max-width: 480px) {
     .page-wrap { padding: 22px 12px; }
-    .invite-card { padding: 30px 18px; border-radius: 16px; }
+    .invite-card { padding: 34px 20px; border-radius: 16px; }
     .details-box { flex-direction: row; }
     .details-box .col { padding: 10px 4px; }
     .countdown .cd-cell { min-width: 48px; padding: 8px 4px; }
     .countdown .cd-num { font-size: 1.05rem; }
+
+    .reveal-item { margin: 22px 0; }
+    .bismillah { font-size: 1.55rem; }
+    .hamdallah { font-size: 1.15rem; }
+    .invite-text { font-size: 1.02rem; line-height: 2.1; }
+    .names-line { font-size: 2.05rem; line-height: 1.6; }
+    .notice-line { font-size: 13.5px; line-height: 2.1; }
+    .final-text { font-size: 1.6rem; }
+    .rsvp-title { font-size: 1.3rem; }
+    .rsvp-row input, .rsvp-row select, .rsvp-row textarea { font-size: 15px; padding: 12px 14px; }
   }
   @media (max-width: 340px) {
     .details-box { flex-direction: column; }
@@ -463,6 +576,18 @@
   <a href="/?style=<%= order.style %>#order">اطلبوا هذا التصميم</a>
 </div>
 <% } %>
+
+<!-- ====== 0. شاشة افتتاحية: أسماء العروسين والتاريخ ====== -->
+<div class="hero-section reveal-item">
+  <div class="hero-names">
+    <%= order.groom_name %><span class="amp"><%= nameConnector %></span><%= order.bride_name %>
+  </div>
+  <% if (order.event_date) { %><div class="hero-date"><%= order.event_date %></div><% } %>
+  <div class="hero-scroll-hint">
+    <span>مرروا للأسفل لمشاهدة تفاصيل الدعوة</span>
+    <span class="arrow">↓</span>
+  </div>
+</div>
 
 <div class="page-wrap">
   <div class="invite-card" id="inviteCard">
@@ -578,6 +703,18 @@
   </div>
 </div>
 
+<!-- ====== شاشة ختامية: شكر وتحية بعد نموذج تأكيد الحضور ====== -->
+<div class="closing-section reveal-item">
+  <div class="closing-emblem">✦</div>
+  <div class="closing-title">بكل الشكر والتقدير</div>
+  <div class="closing-text">
+    نشكركم على مشاركتنا هذه اللحظة الجميلة، بصحبتكم تكتمل فرحتنا ويزداد يومنا بهجة
+  </div>
+  <div class="closing-names">
+    <%= order.groom_name %><span class="amp"><%= nameConnector %></span><%= order.bride_name %>
+  </div>
+</div>
+
 <!-- ====== فيديو البداية (إن وجد) ====== -->
 <% if (order.video_url) { %>
 <div id="introOverlay">
@@ -619,7 +756,7 @@
       });
     }, { threshold: 0.15, rootMargin: '0px 0px -30px 0px' });
     items.forEach(function(item, i) {
-      item.style.transitionDelay = Math.min(i * 0.08, 0.6) + 's';
+      item.style.transitionDelay = Math.min(i * 0.12, 0.9) + 's';
       observer.observe(item);
     });
   }
@@ -670,6 +807,35 @@
   var video = document.getElementById('introVideo');
   var skipBtn = document.getElementById('introSkip');
   setTimeout(function(){ skipBtn.classList.add('show'); }, 1200);
+
+  // نحاول تشغيل الفيديو بالصوت تلقائياً فور تحميل الصفحة. بعض المتصفحات
+  // تسمح بذلك مباشرة؛ أما التي تمنعه (تفرض تفاعلاً حقيقياً من المستخدم أولاً
+  // قبل أي صوت، وهذا قيد من المتصفح نفسه لا يمكن تجاوزه بالكامل) فسيبدأ
+  // الفيديو بكتم الصوت مؤقتاً ثم يُفعَّل الصوت تلقائياً وبصمت (بلا أي زر)
+  // بمجرد أول لمسة/تمرير/ضغطة من المستخدم في أي مكان بالصفحة.
+  video.muted = false;
+  var playAttempt = video.play();
+
+  function unmuteNow(){
+    video.muted = false;
+    video.play().catch(function(){});
+    document.removeEventListener('touchstart', unmuteNow, true);
+    document.removeEventListener('click', unmuteNow, true);
+    document.removeEventListener('scroll', unmuteNow, true);
+    document.removeEventListener('keydown', unmuteNow, true);
+  }
+  document.addEventListener('touchstart', unmuteNow, true);
+  document.addEventListener('click', unmuteNow, true);
+  document.addEventListener('scroll', unmuteNow, true);
+  document.addEventListener('keydown', unmuteNow, true);
+
+  if (playAttempt && playAttempt.catch) {
+    playAttempt.catch(function(){
+      video.muted = true;
+      video.play().catch(function(){});
+    });
+  }
+
   var finished = false;
   function finishIntro(){
     if (finished) return;
@@ -1029,8 +1195,12 @@
     var size = 50 + Math.random() * 44;
     img.style.width = size + 'px';
     img.style.height = size + 'px';
-    img.style.left = (8 + Math.random() * 78) + 'vw';
-    img.style.top = (12 + Math.random() * 68) + 'vh';
+    // نحسب الموضع بالبكسل ضمن حدود الشاشة الفعلية (بدل vw/vh ثابتة) كي لا
+    // يخرج الملصق جزئياً خارج حدود الشاشة على الجوال ويسبب تمريراً أفقياً.
+    var maxLeft = Math.max(0, window.innerWidth - size - 16);
+    var maxTop = Math.max(0, window.innerHeight - size - 24);
+    img.style.left = (8 + Math.random() * maxLeft) + 'px';
+    img.style.top = (12 + Math.random() * maxTop) + 'px';
     img.style.transform = 'translateY(0) rotate(0deg)';
     document.body.appendChild(img);
     requestAnimationFrame(function(){
