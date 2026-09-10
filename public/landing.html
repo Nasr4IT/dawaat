@@ -156,7 +156,7 @@
   .pricing{ padding:80px 24px; background:var(--surface); }
   .pricing-grid{
     display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-    gap:20px; max-width:960px; margin:0 auto;
+    gap:20px; max-width:640px; margin:0 auto;
   }
   .plan{
     background:#fff; border:1px solid var(--line); padding:34px 26px; text-align:center;
@@ -382,24 +382,10 @@
       <div class="price">$250<span> / دعوة</span></div>
       <ul>
         <li>كل مزايا الباقة الأساسية</li>
-        <li>فيديو افتتاحي مخصص بالذكاء الاصطناعي</li>
         <li>عداد تنازلي + إضافة للتقويم</li>
         <li>نموذج تأكيد حضور فعّال</li>
-        <li>مشاركة مباشرة عبر واتساب</li>
       </ul>
       <a href="#" class="btn btn-primary planCta">اطلبوا الآن</a>
-    </div>
-    <div class="plan">
-      <h3>الفاخرة</h3>
-      <div class="price">$450<span> / دعوة</span></div>
-      <ul>
-        <li>كل مزايا الباقة المميزة</li>
-        <li>تصميم فيديو حصري بالكامل</li>
-        <li>لوحة متابعة الحضور للعروسين</li>
-        <li>روابط مخصصة بأسماء الضيوف</li>
-        <li>دعم أولوية حتى يوم الحفل</li>
-      </ul>
-      <a href="#" class="btn btn-ghost planCta">اطلبوا الآن</a>
     </div>
   </div>
 </section>
@@ -436,7 +422,6 @@
         <select name="plan">
           <option value="basic">الأساسية — $100</option>
           <option value="featured" selected>المميزة — $250</option>
-          <option value="luxury">الفاخرة — $450</option>
         </select>
       </div>
       <div class="form-group" style="margin-bottom:14px;">
@@ -465,7 +450,7 @@
       <svg viewBox="0 0 24 24"><path d="M12 2c2.7 0 3.06.01 4.12.06 1.06.05 1.79.22 2.43.47.66.26 1.22.6 1.77 1.16.55.55.9 1.11 1.16 1.77.25.64.42 1.37.47 2.43.05 1.06.06 1.42.06 4.12s-.01 3.06-.06 4.12c-.05 1.06-.22 1.79-.47 2.43a4.9 4.9 0 0 1-1.16 1.77c-.55.55-1.11.9-1.77 1.16-.64.25-1.37.42-2.43.47-1.06.05-1.42.06-4.12.06s-3.06-.01-4.12-.06c-1.06-.05-1.79-.22-2.43-.47a4.9 4.9 0 0 1-1.77-1.16 4.9 4.9 0 0 1-1.16-1.77c-.25-.64-.42-1.37-.47-2.43C2.01 15.06 2 14.7 2 12s.01-3.06.06-4.12c.05-1.06.22-1.79.47-2.43.26-.66.6-1.22 1.16-1.77A4.9 4.9 0 0 1 5.46 2.52c.64-.25 1.37-.42 2.43-.47C8.94 2.01 9.3 2 12 2Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 8.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Zm5.2-8.4a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0Z"/></svg>
     </a>
   </div>
-  <div class="copyright">© 2026 دعوات — جميع الحقوق محفوظة</div>
+  <div class="copyright">© 2026 AvenoCode L.L.C — جميع الحقوق محفوظة</div>
 </footer>
 
 <script>
@@ -474,9 +459,9 @@
 ========================================================= */
 const CONFIG = {
   businessName: "دعوات",
-  whatsappNumber: "963900000000", // digits only, country code first, no + or spaces
+  whatsappNumber: "963964475501", // digits only, country code first, no + or spaces
   whatsappMessage: "مرحباً، أرغب بمعرفة المزيد عن دعوات الزفاف الرقمية",
-  instagramUrl: "https://instagram.com/your_handle"
+  instagramUrl: "https://instagram.com/avenocode"
 };
 
 document.getElementById('brandName').textContent = CONFIG.businessName;
@@ -504,7 +489,11 @@ const dpNames = document.getElementById('dpNames');
 demoBtn.addEventListener('click', () => {
   const n1 = document.getElementById('demoName1').value.trim() || 'محمد';
   const n2 = document.getElementById('demoName2').value.trim() || 'سارة';
-  dpNames.innerHTML = `${n1} <span class="amp">و</span> ${n2}`;
+  // Arabic names get "و"; names typed in English get "&" instead, since
+  // "و" reads as a stray Arabic letter dropped into an English name.
+  const isArabic = /[؀-ۿ]/.test(n1 + n2);
+  const connector = isArabic ? 'و' : '&';
+  dpNames.innerHTML = `${n1} <span class="amp">${connector}</span> ${n2}`;
   demoPreview.classList.add('show');
   burst();
   demoPreview.scrollIntoView({ behavior:'smooth', block:'center' });

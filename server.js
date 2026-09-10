@@ -27,7 +27,7 @@ const PHOTO_MAX_DIMENSION = 1600;
 const STICKER_MAX_DIMENSION = 640;
 const HERO_MAX_DIMENSION = 1000; // hero sticker is displayed larger (up to 500px, more on wide/retina screens)
 
-const PLAN_LABELS = { basic: 'الأساسية', featured: 'المميزة', luxury: 'الفاخرة' };
+const PLAN_LABELS = { basic: 'الأساسية', featured: 'المميزة' };
 const STATUS_LABELS = {
   lead: 'طلب جديد',
   confirmed: 'مؤكد',
@@ -294,7 +294,7 @@ app.post('/api/leads', leadLimiter, (req, res) => {
       return res.status(400).json({ ok: false, error: 'الاسم ورقم الهاتف مطلوبان' });
     }
     if (req.file) await resizeImageInPlace(req.file.path, PHOTO_MAX_DIMENSION);
-    const validPlan = ['basic', 'featured', 'luxury'].includes(plan) ? plan : 'featured';
+    const validPlan = ['basic', 'featured'].includes(plan) ? plan : 'featured';
     const validStyle = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'].includes(style) ? style : 'v1';
     const photoUrl = req.file ? `/assets/uploads/photos/${req.file.filename}` : null;
     const slug = uniqueOrderSlug();
@@ -321,7 +321,7 @@ const SAMPLE_ORDERS = {
   v1: {
     slug: 'demo-v1', groom_name: 'عمر', bride_name: 'لجين',
     event_date: futureDateISO(45), event_time: '19:00',
-    venue: 'قاعة الماسة الكبرى — دمشق', plan: 'luxury', style: 'v1',
+    venue: 'قاعة الماسة الكبرى — دمشق', plan: 'featured', style: 'v1',
     video_url: '/assets/videos/envelope-intro.mp4',
   },
   v2: {
@@ -333,7 +333,7 @@ const SAMPLE_ORDERS = {
   v3: {
     slug: 'demo-v3', groom_name: 'يزن', bride_name: 'دانة',
     event_date: futureDateISO(60), event_time: '20:00',
-    venue: 'فندق الشام الكبير', plan: 'luxury', style: 'v3',
+    venue: 'فندق الشام الكبير', plan: 'featured', style: 'v3',
     video_url: '/assets/videos/envelope-intro.mp4',
   },
   v4: {
@@ -345,7 +345,7 @@ const SAMPLE_ORDERS = {
   v5: {
     slug: 'demo-v5', groom_name: 'وائل', bride_name: 'هبة',
     event_date: futureDateISO(50), event_time: '20:30',
-    venue: 'تراس الياسمين — دمشق', plan: 'luxury', style: 'v5',
+    venue: 'تراس الياسمين — دمشق', plan: 'featured', style: 'v5',
     video_url: '/assets/videos/envelope-intro.mp4',
   },
   v6: {
@@ -357,7 +357,7 @@ const SAMPLE_ORDERS = {
   v7: {
     slug: 'demo-v7', groom_name: 'فادي', bride_name: 'سلمى',
     event_date: futureDateISO(40), event_time: '19:00',
-    venue: 'بستان الليالي — دمشق', plan: 'luxury', style: 'v7',
+    venue: 'بستان الليالي — دمشق', plan: 'featured', style: 'v7',
     video_url: '/assets/videos/envelope-intro.mp4',
   },
 };
@@ -385,7 +385,7 @@ function loadOrderOrSampleBySlug(slug) {
 
 // ---------------------------------------------------------------------------
 // "Add to calendar" — countdown timer's companion, a downloadable .ics file
-// for the event (featured/luxury plans, per the pricing page). Floating
+// for the event (featured plan, per the pricing page). Floating
 // (timezone-less) local time, since the app never collects a venue timezone.
 // ---------------------------------------------------------------------------
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -505,6 +505,14 @@ app.post('/invite/:slug/rsvp', rsvpLimiter, (req, res) => {
   const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
   const order = loadOrderBySlug(req.params.slug);
   if (!order) return isAjax ? res.status(404).json({ ok: false, error: 'الدعوة غير موجودة' }) : res.status(404).send('الدعوة غير موجودة');
+
+  // RSVP confirmation is a featured-plan capability — enforced here too
+  // (not just hidden in the UI) so it can't be used against a basic-plan
+  // invitation via a direct request.
+  if (order.plan === 'basic') {
+    const message = 'ميزة تأكيد الحضور غير متاحة لهذه الدعوة';
+    return isAjax ? res.status(403).json({ ok: false, error: message }) : res.status(403).send(message);
+  }
 
   let guest = null;
   if (req.body.guest_slug) {
@@ -877,7 +885,7 @@ app.post('/admin/orders/:id/delete', requireAdmin, requireCsrf, (req, res) => {
   res.redirect('/admin');
 });
 
-// Guest-specific links (luxury plan)
+// Guest-specific personalized invite links — available regardless of plan.
 app.post('/admin/orders/:id/guests', requireAdmin, requireCsrf, (req, res) => {
   const orderId = req.params.id;
   const name = (req.body.name || '').trim();

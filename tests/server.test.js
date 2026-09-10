@@ -159,7 +159,7 @@ test('full order + RSVP flow: create order, load invite page, submit RSVP', asyn
   const create = await agent
     .post('/admin/orders')
     .type('form')
-    .send({ groom_name: 'كريم', bride_name: 'ليلى', plan: 'luxury', style: 'v3', _csrf: csrf });
+    .send({ groom_name: 'كريم', bride_name: 'ليلى', plan: 'featured', style: 'v3', _csrf: csrf });
   assert.equal(create.status, 302);
   const orderId = create.headers.location.split('/').pop();
 
@@ -313,7 +313,7 @@ test('guest-specific invite link personalizes the RSVP form', async () => {
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
 
-  const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'سامي', bride_name: 'هند', plan: 'luxury', _csrf: csrf });
+  const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'سامي', bride_name: 'هند', plan: 'featured', _csrf: csrf });
   const orderId = create.headers.location.split('/').pop();
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
 
@@ -497,7 +497,7 @@ test('saving a music URL through the text field replaces the old file and persis
   assert.match(detailPage.text, /https:\/\/example\.com\/song\.mp3/, 'the saved URL should be reflected back on reload');
 });
 
-test('invitation page shows the countdown/calendar block for featured and luxury plans, not basic', async () => {
+test('invitation page shows the countdown/calendar block for the featured plan, not basic', async () => {
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
 
@@ -513,10 +513,52 @@ test('invitation page shows the countdown/calendar block for featured and luxury
   assert.doesNotMatch(basicPage.text, /id="countdown"/);
 });
 
+test('RSVP confirmation is a featured-plan capability: shown and accepted for featured, hidden and rejected for basic', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+
+  const featured = await agent.post('/admin/orders').type('form').send({ groom_name: 'ت', bride_name: 'أ', plan: 'featured', _csrf: csrf });
+  const featuredOrder = db.prepare('SELECT slug FROM orders WHERE id = ?').get(featured.headers.location.split('/').pop());
+  const featuredPage = await request(app).get(`/invite/${featuredOrder.slug}`);
+  assert.match(featuredPage.text, /id="rsvpForm"/);
+
+  const basic = await agent.post('/admin/orders').type('form').send({ groom_name: 'ت', bride_name: 'أ', plan: 'basic', _csrf: csrf });
+  const basicOrderId = basic.headers.location.split('/').pop();
+  const basicOrder = db.prepare('SELECT id, slug FROM orders WHERE id = ?').get(basicOrderId);
+  const basicPage = await request(app).get(`/invite/${basicOrder.slug}`);
+  assert.doesNotMatch(basicPage.text, /id="rsvpForm"/);
+
+  const rsvpAttempt = await request(app)
+    .post(`/invite/${basicOrder.slug}/rsvp`)
+    .set('X-Requested-With', 'XMLHttpRequest')
+    .type('form')
+    .send({ name: 'ضيف', attending: 'yes' });
+  assert.equal(rsvpAttempt.status, 403, 'a basic-plan order must reject RSVP submissions server-side too, not just hide the form');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rsvps WHERE order_id = ?').get(basicOrder.id).n, 0);
+});
+
+test('invitation page uses "&" between English names and "و" between Arabic names', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+
+  const englishOrder = await agent.post('/admin/orders').type('form').send({ groom_name: 'John', bride_name: 'Emily', _csrf: csrf });
+  const englishSlug = db.prepare('SELECT slug FROM orders WHERE id = ?').get(englishOrder.headers.location.split('/').pop()).slug;
+  const englishPage = await request(app).get(`/invite/${englishSlug}`);
+  // EJS's `<%=` HTML-escapes "&" to "&amp;" in the markup, which still
+  // renders as "&" in the browser — that's the correct, spec-compliant form.
+  assert.match(englishPage.text, /<span class="amp">&amp;<\/span>/);
+  assert.doesNotMatch(englishPage.text, /<span class="amp">و<\/span>/);
+
+  const arabicOrder = await agent.post('/admin/orders').type('form').send({ groom_name: 'محمد', bride_name: 'سارة', _csrf: csrf });
+  const arabicSlug = db.prepare('SELECT slug FROM orders WHERE id = ?').get(arabicOrder.headers.location.split('/').pop()).slug;
+  const arabicPage = await request(app).get(`/invite/${arabicSlug}`);
+  assert.match(arabicPage.text, /<span class="amp">و<\/span>/);
+});
+
 test('invitation page hides the countdown block when no event date is set', async () => {
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
-  const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'م', bride_name: 'ف', plan: 'luxury', _csrf: csrf });
+  const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'م', bride_name: 'ف', plan: 'featured', _csrf: csrf });
   const order = db.prepare('SELECT slug FROM orders WHERE id = ?').get(create.headers.location.split('/').pop());
   const page = await request(app).get(`/invite/${order.slug}`);
   assert.doesNotMatch(page.text, /id="countdown"/);
@@ -526,7 +568,7 @@ test('GET /invite/:slug/calendar.ics returns a valid .ics file with the event de
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
   const create = await agent.post('/admin/orders').type('form').send({
-    groom_name: 'زياد', bride_name: 'رغد', plan: 'luxury',
+    groom_name: 'زياد', bride_name: 'رغد', plan: 'featured',
     event_date: '2027-03-15', event_time: '20:00', venue: 'قاعة الأمل', _csrf: csrf,
   });
   const order = db.prepare('SELECT slug FROM orders WHERE id = ?').get(create.headers.location.split('/').pop());

@@ -4,11 +4,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><%= order.groom_name %> و<%= order.bride_name %> — دعوة زفاف</title>
+<%
+  // Arabic names get the Arabic conjunction "و"; names written in Latin
+  // script get "&" instead, since "و" reads as a stray Arabic letter
+  // dropped into an English name.
+  const namesAreArabic = /[؀-ۿ]/.test(order.groom_name + order.bride_name);
+  const nameConnector = namesAreArabic ? 'و' : '&';
+%>
+<title><%= order.groom_name %> <%= nameConnector %> <%= order.bride_name %> — دعوة زفاف</title>
 
 <%
   // -------- All EJS logic is here, outside <style> and <script> --------
-  const ogTitle = order.groom_name + ' و' + order.bride_name + ' — دعوة زفاف';
+  const ogTitle = order.groom_name + ' ' + nameConnector + ' ' + order.bride_name + ' — دعوة زفاف';
   const ogDescParts = [];
   if (order.event_date) ogDescParts.push('بتاريخ ' + order.event_date);
   if (order.venue) ogDescParts.push(order.venue);
@@ -477,7 +484,7 @@
 
     <!-- 4. أسماء العروسين -->
     <div class="reveal-item from-left names-line">
-      <%= order.groom_name %><span class="amp">و</span><%= order.bride_name %>
+      <%= order.groom_name %><span class="amp"><%= nameConnector %></span><%= order.bride_name %>
     </div>
 
     <!-- 5. المكان / الوقت / التاريخ -->
@@ -519,7 +526,8 @@
     <!-- 8. يشرفنا حضوركم -->
     <div class="reveal-item from-left final-text">✨ يشرفنا حضوركم ✨</div>
 
-    <!-- 9. نموذج تأكيد الحضور (RSVP) -->
+    <!-- 9. نموذج تأكيد الحضور (RSVP) — ميزة الباقة المميزة فقط -->
+    <% if (order.plan !== 'basic') { %>
     <div class="reveal-item from-right rsvp-block">
       <hr class="rsvp-divider">
       <% if (typeof isDemo !== 'undefined' && isDemo) { %>
@@ -565,6 +573,7 @@
         </form>
       <% } %>
     </div>
+    <% } %>
 
   </div>
 </div>

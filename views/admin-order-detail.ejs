@@ -61,7 +61,7 @@
           <div class="form-group">
             <label>الباقة</label>
             <select name="plan">
-              <% ['basic','featured','luxury'].forEach(p => { %>
+              <% ['basic','featured'].forEach(p => { %>
                 <option value="<%= p %>" <%= order.plan === p ? 'selected' : '' %>><%= PLAN_LABELS[p] %></option>
               <% }) %>
             </select>
@@ -289,7 +289,7 @@
 
     <!-- Guest-specific links -->
     <div class="card">
-      <h2>روابط مخصصة بأسماء الضيوف (الباقة الفاخرة)</h2>
+      <h2>روابط مخصصة بأسماء الضيوف</h2>
       <form method="POST" action="/admin/orders/<%= order.id %>/guests" style="display:flex; gap:10px; margin-bottom:16px;">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="text" name="name" placeholder="اسم الضيف" required style="flex:1;">
