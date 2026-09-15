@@ -309,7 +309,11 @@ test('dashboard paginates results', async () => {
   assert.equal(page2Matches.length, 5);
 });
 
-test('guest-specific invite link personalizes the RSVP form', async () => {
+test('a guest-slug invite link (if one exists) still personalizes the RSVP form', async () => {
+  // The admin UI for creating these links was removed, but the read-side
+  // route stays working for any links already shared before the removal —
+  // this inserts a guest row directly, the way an old, already-existing
+  // record would look.
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
 
@@ -317,7 +321,7 @@ test('guest-specific invite link personalizes the RSVP form', async () => {
   const orderId = create.headers.location.split('/').pop();
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
 
-  await agent.post(`/admin/orders/${order.id}/guests`).type('form').send({ name: 'خالد الضيف', _csrf: csrf });
+  db.prepare('INSERT INTO guests (order_id, name, slug) VALUES (?, ?, ?)').run(order.id, 'خالد الضيف', 'khaled1');
   const guest = db.prepare('SELECT * FROM guests WHERE order_id = ?').get(order.id);
   assert.ok(guest);
 
@@ -325,6 +329,16 @@ test('guest-specific invite link personalizes the RSVP form', async () => {
   assert.equal(guestPage.status, 200);
   assert.match(guestPage.text, /خالد الضيف/);
   assert.match(guestPage.text, new RegExp(`name="guest_slug" value="${guest.slug}"`));
+});
+
+test('the admin guest-link creation feature has been removed', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+  const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'ريم', bride_name: 'وسيم', plan: 'featured', _csrf: csrf });
+  const orderId = create.headers.location.split('/').pop();
+
+  const res = await agent.post(`/admin/orders/${orderId}/guests`).type('form').send({ name: 'ضيف', _csrf: csrf });
+  assert.equal(res.status, 404);
 });
 
 test('re-uploading a photo deletes the old file from disk', async () => {

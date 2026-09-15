@@ -6,6 +6,7 @@
 <title>دعوات — دعوات زفاف سينمائية مصممة بالذكاء الاصطناعي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root{
     --bg:#ffffff;
@@ -367,7 +368,7 @@
   <div class="pricing-grid">
     <div class="plan">
       <h3>الأساسية</h3>
-      <div class="price">$100<span> / دعوة</span></div>
+      <div class="price">120 ل.س<span> / دعوة</span></div>
       <ul>
         <li>تصميم دعوة رقمية كاملة</li>
         <li>فيديو افتتاحي من مكتبتنا الجاهزة</li>
@@ -379,7 +380,7 @@
     <div class="plan featured">
       <div class="badge">الأكثر طلباً</div>
       <h3>المميزة</h3>
-      <div class="price">$250<span> / دعوة</span></div>
+      <div class="price">200 ل.س<span> / دعوة</span></div>
       <ul>
         <li>كل مزايا الباقة الأساسية</li>
         <li>عداد تنازلي + إضافة للتقويم</li>
@@ -418,10 +419,24 @@
         <div class="form-group"><label>تاريخ الحفل (إن وُجد)</label><input type="date" name="event_date"></div>
       </div>
       <div class="form-group" style="margin-bottom:14px;">
+        <label>مكان الحفل (إن وُجد)</label>
+        <input type="text" name="venue" placeholder="مثال: قاعة الماسة الكبرى — دمشق">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>حدّدوا موقع القاعة على الخريطة (اختياري)</label>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+          <input type="text" id="venueSearchInput" placeholder="ابحثوا عن اسم المكان أو العنوان" style="flex:1;">
+          <button type="button" id="venueSearchBtn" style="padding:0 16px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--gold-deep); cursor:pointer; white-space:nowrap;">بحث</button>
+        </div>
+        <div id="venueMap" style="height:220px; border-radius:10px; overflow:hidden; border:1px solid var(--line);"></div>
+        <input type="hidden" name="venue_lat" id="venueLat">
+        <input type="hidden" name="venue_lng" id="venueLng">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
         <label>الباقة المطلوبة</label>
         <select name="plan">
-          <option value="basic">الأساسية — $100</option>
-          <option value="featured" selected>المميزة — $250</option>
+          <option value="basic">الأساسية — 120 ل.س</option>
+          <option value="featured" selected>المميزة — 200 ل.س</option>
         </select>
       </div>
       <div class="form-group" style="margin-bottom:14px;">
@@ -453,6 +468,19 @@
   <div class="copyright">© 2026 AvenoCode L.L.C — جميع الحقوق محفوظة</div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/venue-map.js"></script>
+<script>
+  initVenueMap({
+    mapId: 'venueMap',
+    latInputId: 'venueLat',
+    lngInputId: 'venueLng',
+    searchInputId: 'venueSearchInput',
+    searchBtnId: 'venueSearchBtn',
+    initialLat: null,
+    initialLng: null,
+  });
+</script>
 <script>
 /* =========================================================
    BUSINESS CONFIG — edit these per your brand.

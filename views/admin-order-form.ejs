@@ -6,6 +6,7 @@
 <title>طلب جديد — دعوات</title>
 <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/admin.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 </head>
 <body>
   <div class="topbar">
@@ -29,6 +30,20 @@
         <div class="form-row">
           <div class="form-group"><label>مكان الحفل</label><input type="text" name="venue" value="<%= order && order.venue || '' %>"></div>
           <div class="form-group"><label>رقم الهاتف</label><input type="text" name="phone" value="<%= order && order.phone || '' %>"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>تحديد موقع القاعة على الخريطة (اختياري)</label>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <input type="text" id="venueSearchInput" placeholder="ابحث عن اسم المكان أو العنوان" style="flex:1;">
+            <button type="button" id="venueSearchBtn" class="btn btn-ghost btn-sm" style="white-space:nowrap;">بحث</button>
+          </div>
+          <div id="venueMap" style="height:240px; border-radius:8px; overflow:hidden; border:1px solid var(--line);"></div>
+          <input type="hidden" name="venue_lat" id="venueLat">
+          <input type="hidden" name="venue_lng" id="venueLng">
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>اسم والد العريس (اختياري)</label><input type="text" name="groom_father_name" value="<%= order && order.groom_father_name || '' %>"></div>
+          <div class="form-group"><label>اسم والد العروس (اختياري)</label><input type="text" name="bride_father_name" value="<%= order && order.bride_father_name || '' %>"></div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -55,9 +70,27 @@
           <label>ملاحظات</label>
           <textarea name="note"><%= order && order.note || '' %></textarea>
         </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>برنامج الحفل (اختياري) — سطر لكل فقرة بصيغة: الاسم | الوقت</label>
+          <textarea name="program_schedule" placeholder="استقبال الضيوف | 18:30&#10;بدء الحفل | 19:00&#10;حفل الزفاف | 19:30&#10;قص الكيكة | 21:00" style="direction:rtl; min-height:100px;"><%= order && order.program_schedule || '' %></textarea>
+          <p class="muted" style="font-size:0.75rem; margin-top:4px;">إن تُرك فارغاً، يُعرض برنامج افتراضي مبني على وقت الحفل.</p>
+        </div>
         <button class="btn" type="submit">إنشاء الطلب</button>
       </form>
     </div>
   </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/assets/js/venue-map.js"></script>
+  <script>
+    initVenueMap({
+      mapId: 'venueMap',
+      latInputId: 'venueLat',
+      lngInputId: 'venueLng',
+      searchInputId: 'venueSearchInput',
+      searchBtnId: 'venueSearchBtn',
+      initialLat: <%- JSON.stringify(order && order.venue_lat || null) %>,
+      initialLng: <%- JSON.stringify(order && order.venue_lng || null) %>,
+    });
+  </script>
 </body>
 </html>

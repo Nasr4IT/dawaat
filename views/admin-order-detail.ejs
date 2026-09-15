@@ -6,6 +6,7 @@
 <title><%= order.groom_name %> و<%= order.bride_name %> — دعوات</title>
 <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/admin.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 </head>
 <body>
   <div class="topbar">
@@ -57,6 +58,20 @@
           <div class="form-group"><label>مكان الحفل</label><input type="text" name="venue" value="<%= order.venue || '' %>"></div>
           <div class="form-group"><label>رقم الهاتف</label><input type="text" name="phone" value="<%= order.phone || '' %>"></div>
         </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>تحديد موقع القاعة على الخريطة (اختياري)</label>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <input type="text" id="venueSearchInput" placeholder="ابحث عن اسم المكان أو العنوان" style="flex:1;">
+            <button type="button" id="venueSearchBtn" class="btn btn-ghost btn-sm" style="white-space:nowrap;">بحث</button>
+          </div>
+          <div id="venueMap" style="height:240px; border-radius:8px; overflow:hidden; border:1px solid var(--line);"></div>
+          <input type="hidden" name="venue_lat" id="venueLat" value="<%= order.venue_lat || '' %>">
+          <input type="hidden" name="venue_lng" id="venueLng" value="<%= order.venue_lng || '' %>">
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>اسم والد العريس (اختياري)</label><input type="text" name="groom_father_name" value="<%= order.groom_father_name || '' %>"></div>
+          <div class="form-group"><label>اسم والد العروس (اختياري)</label><input type="text" name="bride_father_name" value="<%= order.bride_father_name || '' %>"></div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>الباقة</label>
@@ -82,6 +97,11 @@
         <div class="form-group" style="margin-bottom:18px;">
           <label>ملاحظات</label>
           <textarea name="note"><%= order.note || '' %></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>برنامج الحفل (اختياري) — سطر لكل فقرة بصيغة: الاسم | الوقت</label>
+          <textarea name="program_schedule" placeholder="استقبال الضيوف | 18:30&#10;بدء الحفل | 19:00&#10;حفل الزفاف | 19:30&#10;قص الكيكة | 21:00" style="direction:rtl; min-height:100px;"><%= scheduleText %></textarea>
+          <p class="muted" style="font-size:0.75rem; margin-top:4px;">إن تُرك فارغاً، يُعرض برنامج افتراضي مبني على وقت الحفل.</p>
         </div>
         <input type="hidden" name="video_url" value="<%= order.video_url || '' %>">
         <button class="btn" type="submit">حفظ التعديلات</button>
@@ -117,10 +137,15 @@
         <input type="hidden" name="event_date" value="<%= order.event_date || '' %>">
         <input type="hidden" name="event_time" value="<%= order.event_time || '' %>">
         <input type="hidden" name="venue" value="<%= order.venue || '' %>">
+        <input type="hidden" name="venue_lat" value="<%= order.venue_lat || '' %>">
+        <input type="hidden" name="venue_lng" value="<%= order.venue_lng || '' %>">
         <input type="hidden" name="phone" value="<%= order.phone || '' %>">
         <input type="hidden" name="plan" value="<%= order.plan %>">
         <input type="hidden" name="style" value="<%= order.style %>">
         <input type="hidden" name="note" value="<%= order.note || '' %>">
+        <input type="hidden" name="groom_father_name" value="<%= order.groom_father_name || '' %>">
+        <input type="hidden" name="bride_father_name" value="<%= order.bride_father_name || '' %>">
+        <input type="hidden" name="program_schedule" value="<%= scheduleText %>">
         <div class="form-group" style="margin-bottom:10px;">
           <label>أو استخدام رابط فيديو خارجي بدلاً من الرفع</label>
           <input type="text" name="video_url" value="<%= order.video_url || '' %>" placeholder="https://...">
@@ -287,40 +312,6 @@
       </form>
     </div>
 
-    <!-- Guest-specific links -->
-    <div class="card">
-      <h2>روابط مخصصة بأسماء الضيوف</h2>
-      <form method="POST" action="/admin/orders/<%= order.id %>/guests" style="display:flex; gap:10px; margin-bottom:16px;">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="text" name="name" placeholder="اسم الضيف" required style="flex:1;">
-        <button class="btn btn-sm" type="submit">إضافة</button>
-      </form>
-      <% if (guests.length === 0) { %>
-        <div class="empty">لا توجد روابط ضيوف بعد</div>
-      <% } else { %>
-        <div class="table-wrap">
-        <table>
-          <thead><tr><th>الضيف</th><th>الرابط</th><th></th></tr></thead>
-          <tbody>
-            <% guests.forEach(g => { %>
-              <tr>
-                <td><%= g.name %></td>
-                <td class="muted"><%= BASE_URL %>/invite/<%= order.slug %>/<%= g.slug %></td>
-                <td style="display:flex; gap:6px;">
-                  <a href="/invite/<%= order.slug %>/<%= g.slug %>" target="_blank" class="btn btn-ghost btn-sm">فتح</a>
-                  <form method="POST" action="/admin/orders/<%= order.id %>/guests/<%= g.id %>/delete">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="btn btn-danger btn-sm" type="submit">حذف</button>
-                  </form>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-        </div>
-      <% } %>
-    </div>
-
     <!-- RSVPs -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -423,6 +414,19 @@
       });
 
     })();
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/assets/js/venue-map.js"></script>
+  <script>
+    initVenueMap({
+      mapId: 'venueMap',
+      latInputId: 'venueLat',
+      lngInputId: 'venueLng',
+      searchInputId: 'venueSearchInput',
+      searchBtnId: 'venueSearchBtn',
+      initialLat: <%- JSON.stringify(order.venue_lat || null) %>,
+      initialLng: <%- JSON.stringify(order.venue_lng || null) %>,
+    });
   </script>
 </body>
 </html>

@@ -68,7 +68,7 @@
             <td><span class="badge badge-<%= o.status %>"><%= STATUS_LABELS[o.status] || o.status %></span></td>
             <td class="muted"><%= o.source === 'landing_form' ? 'نموذج الموقع' : 'يدوي' %></td>
             <td><%= o.phone || '—' %></td>
-            <td><%= o.rsvp_yes %> / <%= o.rsvp_count %><% if (o.guest_count > 0) { %> <span class="muted">(<%= o.guest_count %> رابط ضيف)</span><% } %></td>
+            <td><%= o.rsvp_yes %> / <%= o.rsvp_count %></td>
             <td class="muted"><%= o.created_at %></td>
             <td><a href="/admin/orders/<%= o.id %>" class="btn btn-ghost btn-sm">فتح</a></td>
           </tr>

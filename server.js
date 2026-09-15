@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const db = require('./db');
-const { uniqueOrderSlug, uniqueGuestSlug } = require('./lib/slug');
+const { uniqueOrderSlug } = require('./lib/slug');
 const { getSetting, setSetting, deleteSetting } = require('./lib/settings');
 const { notifyNewLead } = require('./lib/mailer');
 const { resizeImageInPlace } = require('./lib/images');
@@ -289,7 +289,7 @@ app.post('/api/leads', leadLimiter, (req, res) => {
       return res.json({ ok: true }); // silently drop bots
     }
 
-    const { groom_name, bride_name, phone, plan, event_date, note, style } = req.body;
+    const { groom_name, bride_name, phone, plan, event_date, venue, venue_lat, venue_lng, note, style } = req.body;
     if (!groom_name || !bride_name || !phone) {
       return res.status(400).json({ ok: false, error: 'الاسم ورقم الهاتف مطلوبان' });
     }
@@ -297,11 +297,12 @@ app.post('/api/leads', leadLimiter, (req, res) => {
     const validPlan = ['basic', 'featured'].includes(plan) ? plan : 'featured';
     const validStyle = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'].includes(style) ? style : 'v1';
     const photoUrl = req.file ? `/assets/uploads/photos/${req.file.filename}` : null;
+    const { lat, lng } = parseLatLng(venue_lat, venue_lng);
     const slug = uniqueOrderSlug();
     db.prepare(
-      `INSERT INTO orders (slug, groom_name, bride_name, event_date, phone, plan, style, note, photo_url, status, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'lead', 'landing_form')`
-    ).run(slug, groom_name.trim(), bride_name.trim(), event_date || null, phone.trim(), validPlan, validStyle, note || null, photoUrl);
+      `INSERT INTO orders (slug, groom_name, bride_name, event_date, venue, venue_lat, venue_lng, phone, plan, style, note, photo_url, status, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'lead', 'landing_form')`
+    ).run(slug, groom_name.trim(), bride_name.trim(), event_date || null, (venue || '').trim() || null, lat, lng, phone.trim(), validPlan, validStyle, note || null, photoUrl);
     notifyNewLead({ groom_name: groom_name.trim(), bride_name: bride_name.trim(), phone: phone.trim(), plan: validPlan, event_date, note });
     res.json({ ok: true });
   });
@@ -365,7 +366,22 @@ const SAMPLE_ORDERS = {
 app.get('/demo/:style', (req, res) => {
   const sample = SAMPLE_ORDERS[req.params.style];
   if (!sample) return res.status(404).send('غير موجود');
-  res.render('invitation', { order: sample, guest: null, waLink: waLink(), isDemo: true, BASE_URL, ...siteAssets() });
+  const globalAssets = siteAssets();
+  res.render('invitation', {
+    order: sample,
+    guest: null,
+    waLink: waLink(),
+    isDemo: true,
+    BASE_URL,
+    // Templates always showcase the door intro; real invitations only get
+    // one once the couple's admin uploads a video (see /invite/:slug below).
+    introVideoUrl: DEFAULT_INTRO_VIDEO_URL,
+    programSchedule: defaultSchedule(sample.event_time),
+    ...globalAssets,
+    // Same reasoning for background stickers: the site-wide gallery is
+    // showcase-only, never shown on a real order unless uploaded for it.
+    backgroundStickers: [],
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -438,6 +454,70 @@ app.get('/invite/:slug/calendar.ics', (req, res) => {
   res.send(ics);
 });
 
+// Venue coordinates from the map picker — both must be present and valid to
+// count, otherwise the invitation falls back to a text search on the venue
+// name (see orderVenueMapLinks below).
+function parseLatLng(rawLat, rawLng) {
+  const lat = parseFloat(rawLat);
+  const lng = parseFloat(rawLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { lat: null, lng: null };
+  }
+  return { lat, lng };
+}
+
+// Program schedule ("برنامج الحفل") is edited in admin as one "التسمية | الوقت"
+// line per row and stored as JSON — simpler than a repeating-fieldset admin UI.
+function parseScheduleInput(text) {
+  if (!text) return null;
+  const rows = String(text)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, time] = line.split('|').map((s) => (s || '').trim());
+      return { label: label || '', time: time || '' };
+    })
+    .filter((r) => r.label);
+  return rows.length ? JSON.stringify(rows) : null;
+}
+
+function scheduleToText(json) {
+  if (!json) return '';
+  let rows = [];
+  try { rows = JSON.parse(json); } catch (e) { return ''; }
+  if (!Array.isArray(rows)) return '';
+  return rows.map((r) => `${r.label || ''} | ${r.time || ''}`).join('\n');
+}
+
+function parseScheduleJson(json) {
+  if (!json) return [];
+  try {
+    const rows = JSON.parse(json);
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// A generic, sensible default so the program-schedule section still has
+// something to show when the couple hasn't customized it yet, anchored on
+// the order's own event time rather than an arbitrary invented time.
+function defaultSchedule(eventTime) {
+  const [hh, mm] = (eventTime || '19:00').split(':').map(Number);
+  const base = new Date(2000, 0, 1, hh || 19, mm || 0);
+  const at = (offsetMinutes) => {
+    const d = new Date(base.getTime() + offsetMinutes * 60000);
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  };
+  return [
+    { label: 'استقبال الضيوف', time: at(0) },
+    { label: 'بدء الحفل', time: at(30) },
+    { label: 'حفل الزفاف', time: at(60) },
+    { label: 'قص الكيكة', time: at(150) },
+  ];
+}
+
 function siteAssets() {
   return {
     musicUrl: getSetting('background_music_url'),
@@ -446,6 +526,17 @@ function siteAssets() {
     groomStickerUrl: getSetting('groom_sticker_url'),
     backgroundStickers: db.prepare('SELECT url FROM stickers ORDER BY created_at DESC').all().map((s) => s.url),
   };
+}
+
+// The door-opening intro is a showcase asset used only on /demo template
+// pages, so prospective customers see the full effect before ordering. Real
+// invitations stay video-free until the couple's admin uploads their own.
+const DEFAULT_INTRO_VIDEO_URL = '/assets/videos/door-intro.mp4';
+
+function orderProgramSchedule(order) {
+  const custom = parseScheduleJson(order.program_schedule);
+  if (custom.length) return custom;
+  return order.event_time ? defaultSchedule(order.event_time) : [];
 }
 
 app.get('/invite/:slug', (req, res) => {
@@ -471,6 +562,10 @@ app.get('/invite/:slug', (req, res) => {
     heroStickerUrl: globalAssets.heroStickerUrl,
     brideStickerUrl: globalAssets.brideStickerUrl,
     groomStickerUrl: globalAssets.groomStickerUrl,
+    // Real invitations stay video-free until the couple's admin uploads one
+    // — the default door intro is a templates-only showcase (see /demo above).
+    introVideoUrl: order.video_url || null,
+    programSchedule: orderProgramSchedule(order),
   });
 });
 
@@ -498,6 +593,10 @@ app.get('/invite/:slug/:guestSlug', (req, res) => {
     heroStickerUrl: globalAssets.heroStickerUrl,
     brideStickerUrl: globalAssets.brideStickerUrl,
     groomStickerUrl: globalAssets.groomStickerUrl,
+    // Real invitations stay video-free until the couple's admin uploads one
+    // — the default door intro is a templates-only showcase (see /demo above).
+    introVideoUrl: order.video_url || null,
+    programSchedule: orderProgramSchedule(order),
   });
 });
 
@@ -602,8 +701,7 @@ app.get('/admin', requireAdmin, (req, res) => {
     .prepare(
       `SELECT o.*,
               (SELECT COUNT(*) FROM rsvps r WHERE r.order_id = o.id) AS rsvp_count,
-              (SELECT COUNT(*) FROM rsvps r WHERE r.order_id = o.id AND r.attending = 'yes') AS rsvp_yes,
-              (SELECT COUNT(*) FROM guests g WHERE g.order_id = o.id) AS guest_count
+              (SELECT COUNT(*) FROM rsvps r WHERE r.order_id = o.id AND r.attending = 'yes') AS rsvp_yes
        FROM orders o
        ${whereClause}
        ORDER BY o.created_at DESC
@@ -631,15 +729,19 @@ app.get('/admin/orders/new', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/orders', requireAdmin, requireCsrf, (req, res) => {
-  const { groom_name, bride_name, event_date, event_time, venue, plan, style, phone, note } = req.body;
+  const {
+    groom_name, bride_name, event_date, event_time, venue, venue_lat, venue_lng, plan, style, phone, note,
+    groom_father_name, bride_father_name, program_schedule,
+  } = req.body;
   if (!groom_name || !bride_name) {
     return res.render('admin-order-form', { order: req.body, PLAN_LABELS, error: 'أسماء العروسين مطلوبة' });
   }
+  const { lat, lng } = parseLatLng(venue_lat, venue_lng);
   const slug = uniqueOrderSlug();
   const info = db
     .prepare(
-      `INSERT INTO orders (slug, groom_name, bride_name, event_date, event_time, venue, plan, style, phone, note, status, source, viewed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', 'admin', datetime('now'))`
+      `INSERT INTO orders (slug, groom_name, bride_name, event_date, event_time, venue, venue_lat, venue_lng, plan, style, phone, note, groom_father_name, bride_father_name, program_schedule, status, source, viewed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', 'admin', datetime('now'))`
     )
     .run(
       slug,
@@ -648,10 +750,15 @@ app.post('/admin/orders', requireAdmin, requireCsrf, (req, res) => {
       event_date || null,
       event_time || null,
       venue || null,
+      lat,
+      lng,
       plan || 'featured',
       style || 'v1',
       phone || null,
-      note || null
+      note || null,
+      (groom_father_name || '').trim() || null,
+      (bride_father_name || '').trim() || null,
+      parseScheduleInput(program_schedule)
     );
   res.redirect(`/admin/orders/${info.lastInsertRowid}`);
 });
@@ -667,11 +774,11 @@ const ORDER_DETAIL_ERROR_KEYS = [
 function renderOrderDetail(res, orderId, overrides = {}) {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
   if (!order) return res.status(404).send('غير موجود');
-  const guests = db.prepare('SELECT * FROM guests WHERE order_id = ? ORDER BY created_at DESC').all(order.id);
   const rsvps = db.prepare('SELECT * FROM rsvps WHERE order_id = ? ORDER BY created_at DESC').all(order.id);
+  const scheduleText = scheduleToText(order.program_schedule);
   const errors = {};
   ORDER_DETAIL_ERROR_KEYS.forEach((k) => { errors[k] = null; });
-  res.render('admin-order-detail', { order, guests, rsvps, PLAN_LABELS, STATUS_LABELS, BASE_URL, ...errors, ...overrides });
+  res.render('admin-order-detail', { order, rsvps, scheduleText, PLAN_LABELS, STATUS_LABELS, BASE_URL, ...errors, ...overrides });
 }
 
 app.get('/admin/orders/:id', requireAdmin, (req, res) => {
@@ -686,12 +793,21 @@ app.get('/admin/orders/:id', requireAdmin, (req, res) => {
 // Text-field update. Video is handled by a separate upload route below so a
 // bad video upload never risks wiping out the rest of the saved details.
 app.post('/admin/orders/:id', requireAdmin, requireCsrf, (req, res) => {
-  const { groom_name, bride_name, event_date, event_time, venue, plan, style, phone, note, video_url, music_url } = req.body;
+  const {
+    groom_name, bride_name, event_date, event_time, venue, venue_lat, venue_lng, plan, style, phone, note, video_url, music_url,
+    groom_father_name, bride_father_name, program_schedule,
+  } = req.body;
+  const { lat, lng } = parseLatLng(venue_lat, venue_lng);
   // Also we could accept sticker_urls from a text input if we wanted, but we have a separate upload.
   db.prepare(
-    `UPDATE orders SET groom_name=?, bride_name=?, event_date=?, event_time=?, venue=?, plan=?, style=?, phone=?, note=?, video_url=?, music_url=?
+    `UPDATE orders SET groom_name=?, bride_name=?, event_date=?, event_time=?, venue=?, venue_lat=?, venue_lng=?, plan=?, style=?, phone=?, note=?, video_url=?, music_url=?,
+     groom_father_name=?, bride_father_name=?, program_schedule=?
      WHERE id = ?`
-  ).run(groom_name, bride_name, event_date || null, event_time || null, venue || null, plan, style, phone || null, note || null, video_url || null, music_url || null, req.params.id);
+  ).run(
+    groom_name, bride_name, event_date || null, event_time || null, venue || null, lat, lng, plan, style, phone || null, note || null, video_url || null, music_url || null,
+    (groom_father_name || '').trim() || null, (bride_father_name || '').trim() || null, parseScheduleInput(program_schedule),
+    req.params.id
+  );
   res.redirect(`/admin/orders/${req.params.id}`);
 });
 
@@ -883,22 +999,6 @@ app.post('/admin/orders/:id/delete', requireAdmin, requireCsrf, (req, res) => {
   }
   db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
   res.redirect('/admin');
-});
-
-// Guest-specific personalized invite links — available regardless of plan.
-app.post('/admin/orders/:id/guests', requireAdmin, requireCsrf, (req, res) => {
-  const orderId = req.params.id;
-  const name = (req.body.name || '').trim();
-  if (name) {
-    const slug = uniqueGuestSlug(orderId);
-    db.prepare('INSERT INTO guests (order_id, name, slug) VALUES (?, ?, ?)').run(orderId, name, slug);
-  }
-  res.redirect(`/admin/orders/${orderId}`);
-});
-
-app.post('/admin/orders/:id/guests/:guestId/delete', requireAdmin, requireCsrf, (req, res) => {
-  db.prepare('DELETE FROM guests WHERE id = ? AND order_id = ?').run(req.params.guestId, req.params.id);
-  res.redirect(`/admin/orders/${req.params.id}`);
 });
 
 // Removes a spam/duplicate/mistaken RSVP entry. Scoped to order_id in the

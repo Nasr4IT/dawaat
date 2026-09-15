@@ -58,6 +58,31 @@
   const watermarkBride = hasIndividualPhotos ? (order.bride_photo_url || order.photo_url || null) : null;
   const watermarkGroom = hasIndividualPhotos ? (order.groom_photo_url || order.photo_url || null) : null;
   const watermarkSingle = !hasIndividualPhotos ? (order.photo_url || null) : null;
+
+  // Section 1 (door intro) — a couple-specific uploaded video always wins;
+  // otherwise the site's default door-opening intro plays for every guest.
+  const introSrc = typeof introVideoUrl !== 'undefined' ? introVideoUrl : (order.video_url || null);
+
+  // Section 3 — Surah Ar-Rum, ayah 21, unless the project already has a
+  // different verse configured (it doesn't yet, so this is the default).
+  const ayahText = 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً ۚ إِنَّ فِي ذَٰلِكَ لَآيَاتٍ لِّقَوْمٍ يَتَفَكَّرُونَ';
+
+  // Section 4 — names both families only when their names are actually on
+  // file; otherwise keep the existing generic wording rather than inventing
+  // names that were never provided.
+  const hasBothFathers = Boolean(order.groom_father_name && order.bride_father_name);
+  const invitationWording = hasBothFathers
+    ? `تتشرف عائلة ${order.groom_father_name} وعائلة ${order.bride_father_name} بدعوتكم لمشاركتهم أفراحهم بحفل زفاف ${order.groom_name} و${order.bride_name}`
+    : 'بكل الحب والود نتشرف بدعوتكم لمشاركتنا فرحة العمر وحضور حفل زفافنا';
+
+  // Section 9 — location: a precise pin (from the admin/order-form map
+  // picker) takes priority; otherwise fall back to a text search on the
+  // venue name. Google's classic no-API-key embed/search links, either way.
+  const hasVenueCoords = typeof order.venue_lat === 'number' && typeof order.venue_lng === 'number';
+  const venueQuery = hasVenueCoords ? `${order.venue_lat},${order.venue_lng}` : (order.venue ? encodeURIComponent(order.venue) : null);
+  const showLocation = Boolean(order.venue || hasVenueCoords);
+
+  const scheduleRows = typeof programSchedule !== 'undefined' ? programSchedule : [];
 %>
 
 <!-- Open Graph -->
@@ -191,6 +216,11 @@
     gap: 18px;
     padding: 40px 20px;
     text-align: center;
+  }
+  .hero-tagline {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1rem, 3.6vw, 1.25rem);
+    color: var(--muted);
   }
   .hero-names {
     font-family: var(--heading-font);
@@ -348,6 +378,27 @@
     opacity: 0.9;
   }
 
+  /* قسم 3: بطاقة الآية القرآنية — صندوق ناعم بلون العروسين المعتمد لهذا
+     التصميم (بدل لون وردي/كريمي ثابت يتعارض مع بعض الأنماط السبعة) */
+  .ayah-card {
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 16px;
+    padding: 20px 18px;
+  }
+  .ayah-text {
+    font-family: 'Amiri', serif;
+    font-size: clamp(1rem, 3.4vw, 1.15rem);
+    color: var(--ink);
+    line-height: 2.1;
+  }
+  .ayah-ref {
+    font-family: 'Tajawal', sans-serif;
+    font-size: 11px;
+    color: var(--accent-deep);
+    margin-top: 10px;
+  }
+
   .invite-text {
     font-family: 'Tajawal', sans-serif;
     font-size: clamp(0.85rem, 2.4vw, 0.95rem);
@@ -355,14 +406,33 @@
     line-height: 1.9;
   }
 
-  .names-line {
+  /* قسم 5: بطاقة أسماء العروسين مع فاصل الخاتم وأسماء الأهل */
+  .names-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .names-row .person {
     font-family: var(--heading-font);
-    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    font-size: clamp(1.5rem, 5.6vw, 2.05rem);
     font-weight: 700;
     color: var(--ink);
     line-height: 1.5;
   }
-  .names-line .amp { color: var(--accent); font-size: 0.75em; margin: 0 6px; }
+  .names-row .divider-icon {
+    font-size: clamp(1rem, 3.4vw, 1.3rem);
+    flex-shrink: 0;
+  }
+  .parents-row {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 
   .details-box {
     display: flex;
@@ -390,7 +460,13 @@
     word-break: break-word;
   }
 
-  /* ====== العداد التنازلي + إضافة للتقويم (الباقتان المميزة والفاخرة) ====== */
+  /* ====== العداد التنازلي (الباقة المميزة) ====== */
+  .countdown-title {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.1rem, 3.6vw, 1.4rem);
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
   .countdown {
     display: flex;
     justify-content: center;
@@ -424,24 +500,115 @@
     color: var(--accent);
     margin-bottom: 14px;
   }
+  /* قسم 8: زر إضافة للتقويم — عريض بلون التمييز، بدل شريحة صغيرة */
   .calendar-btn {
-    display: inline-block;
+    display: block;
+    width: 100%;
     font-family: 'Tajawal', sans-serif;
-    font-size: 12px;
-    color: var(--accent-deep);
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1408;
     text-decoration: none;
-    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-    padding: 8px 18px;
-    border-radius: 20px;
-    transition: background .2s ease;
+    background: var(--accent);
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-align: center;
+    transition: background .2s ease, transform .1s ease;
   }
-  .calendar-btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .calendar-btn:hover { background: var(--accent-deep); }
+  .calendar-btn:active { transform: scale(0.98); }
 
   .notice-line {
     font-size: 12px;
     color: var(--muted);
     line-height: 1.9;
   }
+
+  /* قسم 7: برنامج الحفل — قائمة بخط زمني رأسي واصل */
+  .program-title {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.1rem, 3.6vw, 1.4rem);
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .program-list {
+    text-align: right;
+    position: relative;
+    padding-inline-start: 22px;
+  }
+  .program-list::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 5px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: color-mix(in srgb, var(--muted) 35%, transparent);
+  }
+  .program-row {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 0;
+  }
+  .program-icon {
+    position: absolute;
+    inset-inline-start: -22px;
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--surface);
+  }
+  .program-label {
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .program-time {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* قسم 9: الموقع */
+  .location-title {
+    font-family: 'Aref Ruqaa', serif;
+    font-size: clamp(1.05rem, 3.4vw, 1.3rem);
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .location-map {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+    margin-bottom: 14px;
+  }
+  .location-map iframe {
+    display: block;
+    width: 100%;
+    height: 200px;
+    border: 0;
+  }
+  .location-actions {
+    display: flex;
+    gap: 10px;
+  }
+  .location-btn {
+    flex: 1;
+    display: block;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 11px 8px;
+    border-radius: 8px;
+    text-align: center;
+    background: var(--accent);
+    color: #1a1408;
+    transition: background .2s ease;
+  }
+  .location-btn:hover { background: var(--accent-deep); }
 
   .final-text {
     font-family: 'Aref Ruqaa', serif;
@@ -478,6 +645,61 @@
     width: 100%;
   }
   .rsvp-row textarea { resize: vertical; min-height: 64px; }
+
+  /* هل ستحضرون؟ — أزرار تبديل بدل قائمة منسدلة */
+  .attend-toggle {
+    display: flex;
+    gap: 8px;
+  }
+  .attend-btn {
+    flex: 1;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12.5px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .attend-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1a1408;
+    font-weight: 500;
+  }
+
+  /* عدد الحضور — عدّاد بأزرار +/- بدل حقل رقمي */
+  .count-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: fit-content;
+    margin: 0 auto;
+  }
+  .count-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    background: transparent;
+    color: var(--accent-deep);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .count-btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .count-value {
+    min-width: 24px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
   .rsvp-submit {
     width: 100%;
     padding: 12px 20px;
@@ -498,6 +720,40 @@
   .rsvp-feedback.ok { color: #4caf6f; }
   .rsvp-feedback.err { color: #e0596a; }
   .rsvp-demo-note { font-size: 13px; color: var(--muted); line-height: 1.8; }
+
+  /* مشاركة الدعوة */
+  .share-btn {
+    display: block;
+    width: 100%;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #e8747f, #d8607a);
+    border: none;
+    padding: 13px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(216, 96, 122, 0.35);
+    transition: transform .1s ease;
+  }
+  .share-btn:active { transform: scale(0.98); }
+  .share-toast {
+    position: fixed;
+    bottom: 84px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #1a1408;
+    color: #fff;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .share-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ====== عرض تجريبي (إن وجد) ====== */
   .demo-banner {
@@ -577,8 +833,9 @@
 </div>
 <% } %>
 
-<!-- ====== 0. شاشة افتتاحية: أسماء العروسين والتاريخ ====== -->
+<!-- ====== قسم 2: أسماء العروسين (الشاشة الافتتاحية) ====== -->
 <div class="hero-section reveal-item">
+  <div class="hero-tagline">بإذن الله وتوفيقه</div>
   <div class="hero-names">
     <%= order.groom_name %><span class="amp"><%= nameConnector %></span><%= order.bride_name %>
   </div>
@@ -599,17 +856,34 @@
     <!-- 1. بسم الله الرحمن الرحيم -->
     <div class="reveal-item from-right bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
 
-    <!-- 2. الحمد لله الذي تتم بنعمته الصالحات -->
-    <div class="reveal-item from-left hamdallah">الحمد لله الذي تتم بنعمته الصالحات</div>
-
-    <!-- 3. نص الدعوة -->
-    <div class="reveal-item from-right invite-text">
-      بكل الحب والود نتشرف بدعوتكم لمشاركتنا فرحة العمر وحضور حفل زفافنا
+    <!-- قسم 3: آية قرآنية عن الزواج (سورة الروم: 21) -->
+    <div class="reveal-item from-left ayah-card">
+      <div class="ayah-text"><%= ayahText %></div>
+      <div class="ayah-ref">(الروم: ٢١)</div>
     </div>
 
-    <!-- 4. أسماء العروسين -->
-    <div class="reveal-item from-left names-line">
-      <%= order.groom_name %><span class="amp"><%= nameConnector %></span><%= order.bride_name %>
+    <!-- الحمد لله الذي تتم بنعمته الصالحات -->
+    <div class="reveal-item from-left hamdallah">الحمد لله الذي تتم بنعمته الصالحات</div>
+
+    <!-- قسم 4: نص الدعوة -->
+    <div class="reveal-item from-right invite-text">
+      <%= invitationWording %>
+    </div>
+
+    <!-- قسم 5: بطاقة أسماء العروسين -->
+    <div class="reveal-item from-left names-card">
+      <div class="names-row">
+        <span class="person"><%= order.groom_name %></span>
+        <span class="divider-icon">💍</span>
+        <span class="person"><%= order.bride_name %></span>
+      </div>
+      <% if (order.groom_father_name || order.bride_father_name) { %>
+        <div class="parents-row">
+          <% if (order.groom_father_name) { %><span>نجل السيد <%= order.groom_father_name %></span><% } %>
+          <% if (order.groom_father_name && order.bride_father_name) { %><span> — </span><% } %>
+          <% if (order.bride_father_name) { %><span>وابنة السيد <%= order.bride_father_name %></span><% } %>
+        </div>
+      <% } %>
     </div>
 
     <!-- 5. المكان / الوقت / التاريخ -->
@@ -628,9 +902,10 @@
       </div>
     </div>
 
-    <!-- 6. العداد التنازلي + إضافة للتقويم (الباقتان المميزة والفاخرة) -->
+    <!-- قسم 6: العداد التنازلي (الباقة المميزة) -->
     <% if (order.plan !== 'basic' && order.event_date) { %>
       <div class="reveal-item from-left countdown-block">
+        <div class="countdown-title">باقي على الفرح</div>
         <div class="countdown" id="countdown" data-target="<%= order.event_date %>T<%= order.event_time || '19:00' %>:00">
           <div class="cd-cell"><span class="cd-num" id="cdDays">—</span><span class="cd-label">يوم</span></div>
           <div class="cd-cell"><span class="cd-num" id="cdHours">—</span><span class="cd-label">ساعة</span></div>
@@ -638,18 +913,53 @@
           <div class="cd-cell"><span class="cd-num" id="cdSeconds">—</span><span class="cd-label">ثانية</span></div>
         </div>
         <div class="countdown-done" id="countdownDone" style="display:none;">🎉 حان وقت الفرح!</div>
-        <a class="calendar-btn" href="/invite/<%= order.slug %>/calendar.ics">📅 أضيفوا الموعد إلى تقويمكم</a>
       </div>
     <% } %>
 
-    <!-- 7. ملاحظات مختصرة -->
+    <!-- قسم 7: برنامج الحفل -->
+    <% if (scheduleRows.length) { %>
+      <div class="reveal-item from-right program-block">
+        <div class="program-title">برنامج الحفل</div>
+        <div class="program-list">
+          <% scheduleRows.forEach(function(row) { %>
+            <div class="program-row">
+              <span class="program-icon">✦</span>
+              <span class="program-label"><%= row.label %></span>
+              <span class="program-time"><%= row.time %></span>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- قسم 8: إضافة للتقويم -->
+    <% if (order.event_date) { %>
+      <div class="reveal-item from-left">
+        <a class="calendar-btn" href="/invite/<%= order.slug %>/calendar.ics">📅 أضيفوا الحدث لتقويمكم</a>
+      </div>
+    <% } %>
+
+    <!-- ملاحظات مختصرة -->
     <div class="reveal-item from-right notice-line">
       نرجو الحضور في الوقت المحدد<br>
       يسعدنا تأكيدكم للحضور مسبقاً
     </div>
 
-    <!-- 8. يشرفنا حضوركم -->
-    <div class="reveal-item from-left final-text">✨ يشرفنا حضوركم ✨</div>
+    <!-- قسم 9: الموقع -->
+    <% if (showLocation) { %>
+      <div class="reveal-item from-left location-block">
+        <div class="location-title"><%= order.venue || 'موقع الحفل' %></div>
+        <div class="location-map">
+          <iframe src="https://maps.google.com/maps?q=<%= venueQuery %>&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="الموقع"></iframe>
+        </div>
+        <div class="location-actions">
+          <a class="location-btn" href="https://www.google.com/maps/search/?api=1&query=<%= venueQuery %>" target="_blank" rel="noopener">فتح في خرائط جوجل</a>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- يشرفنا حضوركم -->
+    <div class="reveal-item from-right final-text">✨ يشرفنا حضوركم ✨</div>
 
     <!-- 9. نموذج تأكيد الحضور (RSVP) — ميزة الباقة المميزة فقط -->
     <% if (order.plan !== 'basic') { %>
@@ -678,16 +988,22 @@
             <input type="text" id="rsvpName" name="name" required value="<%= (guest && guest.name) || '' %>" placeholder="اكتب اسمك هنا">
           </div>
           <div class="rsvp-row">
-            <label for="rsvpAttending">هل ستحضرون؟</label>
-            <select id="rsvpAttending" name="attending">
-              <option value="yes">نعم، بكل سرور</option>
-              <option value="maybe">ربما</option>
-              <option value="no">عذراً، لن نتمكن</option>
-            </select>
+            <label>هل ستحضرون؟</label>
+            <div class="attend-toggle" id="attendToggle">
+              <button type="button" class="attend-btn active" data-value="yes">نعم</button>
+              <button type="button" class="attend-btn" data-value="maybe">ربما</button>
+              <button type="button" class="attend-btn" data-value="no">لن نتمكن</button>
+            </div>
+            <input type="hidden" id="rsvpAttending" name="attending" value="yes">
           </div>
           <div class="rsvp-row">
-            <label for="rsvpCount">عدد الحضور</label>
-            <input type="number" id="rsvpCount" name="guest_count" min="1" value="1">
+            <label>عدد الحضور</label>
+            <div class="count-stepper">
+              <button type="button" class="count-btn" data-step="-1" aria-label="إنقاص العدد">−</button>
+              <span class="count-value" id="rsvpCountValue">1</span>
+              <button type="button" class="count-btn" data-step="1" aria-label="زيادة العدد">+</button>
+            </div>
+            <input type="hidden" id="rsvpCount" name="guest_count" value="1">
           </div>
           <div class="rsvp-row">
             <label for="rsvpNote">ملاحظة (اختياري)</label>
@@ -699,6 +1015,11 @@
       <% } %>
     </div>
     <% } %>
+
+    <!-- مشاركة الدعوة -->
+    <div class="reveal-item from-left">
+      <button type="button" class="share-btn" id="shareBtn">💌 شارك الدعوة</button>
+    </div>
 
   </div>
 </div>
@@ -715,10 +1036,10 @@
   </div>
 </div>
 
-<!-- ====== فيديو البداية (إن وجد) ====== -->
-<% if (order.video_url) { %>
+<!-- ====== فيديو البداية: بوابة تُفتح — تُعرض دائماً كأول شيء يراه الضيف ====== -->
+<% if (introSrc) { %>
 <div id="introOverlay">
-  <video id="introVideo" src="<%= order.video_url %>" autoplay muted playsinline></video>
+  <video id="introVideo" src="<%= introSrc %>" autoplay muted playsinline></video>
   <button id="introSkip" type="button">تخطي ↓</button>
 </div>
 <% } %>
@@ -728,6 +1049,9 @@
   <audio id="bgMusic" src="<%= musicUrl %>" loop preload="auto"></audio>
   <button id="musicToggle" type="button" aria-label="تشغيل الموسيقى">♪</button>
 <% } %>
+
+<!-- ====== تنبيه نسخ رابط المشاركة ====== -->
+<div class="share-toast" id="shareToast">تم النسخ</div>
 
 <!-- ============================================================== -->
 <!-- ======================== SCRIPTS ============================= -->
@@ -799,7 +1123,7 @@
 </script>
 
 <!-- ====== سكربت الفيديو الافتتاحي ====== -->
-<% if (order.video_url) { %>
+<% if (introSrc) { %>
 <script>
 (function(){
   document.body.classList.add('intro-active');
@@ -812,7 +1136,8 @@
   // تسمح بذلك مباشرة؛ أما التي تمنعه (تفرض تفاعلاً حقيقياً من المستخدم أولاً
   // قبل أي صوت، وهذا قيد من المتصفح نفسه لا يمكن تجاوزه بالكامل) فسيبدأ
   // الفيديو بكتم الصوت مؤقتاً ثم يُفعَّل الصوت تلقائياً وبصمت (بلا أي زر)
-  // بمجرد أول لمسة/تمرير/ضغطة من المستخدم في أي مكان بالصفحة.
+  // بمجرد أول تفاعل حقيقي من المستخدم. ملاحظة: "scroll" لا يُحتسب كتفاعل
+  // مستخدم حقيقي من منظور سياسة المتصفح، لذا لا نعتمد عليه هنا.
   video.muted = false;
   var playAttempt = video.play();
 
@@ -820,13 +1145,13 @@
     video.muted = false;
     video.play().catch(function(){});
     document.removeEventListener('touchstart', unmuteNow, true);
-    document.removeEventListener('click', unmuteNow, true);
-    document.removeEventListener('scroll', unmuteNow, true);
+    document.removeEventListener('mousedown', unmuteNow, true);
+    document.removeEventListener('pointerdown', unmuteNow, true);
     document.removeEventListener('keydown', unmuteNow, true);
   }
   document.addEventListener('touchstart', unmuteNow, true);
-  document.addEventListener('click', unmuteNow, true);
-  document.addEventListener('scroll', unmuteNow, true);
+  document.addEventListener('mousedown', unmuteNow, true);
+  document.addEventListener('pointerdown', unmuteNow, true);
   document.addEventListener('keydown', unmuteNow, true);
 
   if (playAttempt && playAttempt.catch) {
@@ -850,7 +1175,17 @@
   video.addEventListener('ended', finishIntro);
   skipBtn.addEventListener('click', finishIntro);
   video.addEventListener('error', finishIntro);
-  setTimeout(finishIntro, 9000);
+
+  // شبكة أمان فقط في حال لم يُطلق الحدث 'ended' لأي سبب (فيديو تالف، متصفح
+  // غريب...) — تُحسب حسب مدة الفيديو الفعلية بدل رقم ثابت، كي لا تقطع فيديو
+  // البوابة الطويل قبل انتهائه فعلياً.
+  var fallbackTimer = setTimeout(finishIntro, 15000);
+  video.addEventListener('loadedmetadata', function(){
+    if (video.duration && isFinite(video.duration)) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = setTimeout(finishIntro, video.duration * 1000 + 3000);
+    }
+  });
 })();
 </script>
 <% } else { %>
@@ -1133,6 +1468,32 @@
   var feedback = document.getElementById('rsvpFeedback');
   var submitBtn = form.querySelector('.rsvp-submit');
 
+  // "هل ستحضرون؟" أزرار تبديل تكتب قيمتها في حقل مخفي بدل قائمة منسدلة
+  var attendToggle = document.getElementById('attendToggle');
+  var attendInput = document.getElementById('rsvpAttending');
+  if (attendToggle && attendInput) {
+    attendToggle.querySelectorAll('.attend-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        attendToggle.querySelectorAll('.attend-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        attendInput.value = btn.dataset.value;
+      });
+    });
+  }
+
+  // عدّاد عدد الحضور بأزرار +/-
+  var countValueEl = document.getElementById('rsvpCountValue');
+  var countInput = document.getElementById('rsvpCount');
+  if (countValueEl && countInput) {
+    document.querySelectorAll('.count-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var next = Math.max(1, parseInt(countInput.value, 10) + parseInt(btn.dataset.step, 10));
+        countInput.value = next;
+        countValueEl.textContent = next;
+      });
+    });
+  }
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
     feedback.textContent = '';
@@ -1164,6 +1525,36 @@
         feedback.textContent = 'تعذر الاتصال بالخادم، تحقق من الإنترنت وحاول مرة أخرى.';
         feedback.className = 'rsvp-feedback err';
       });
+  });
+})();
+</script>
+
+<!-- ====== سكربت مشاركة الدعوة ====== -->
+<script>
+(function(){
+  var shareBtn = document.getElementById('shareBtn');
+  if (!shareBtn) return;
+  var toast = document.getElementById('shareToast');
+
+  function showToast(text){
+    if (!toast) return;
+    toast.textContent = text;
+    toast.classList.add('show');
+    setTimeout(function(){ toast.classList.remove('show'); }, 2200);
+  }
+
+  shareBtn.addEventListener('click', function(){
+    var url = window.location.href;
+    var title = document.title;
+    if (navigator.share) {
+      navigator.share({ title: title, url: url }).catch(function(){});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function(){ showToast('تم النسخ'); }).catch(function(){ showToast('تعذر النسخ'); });
+    } else {
+      showToast('تعذر النسخ');
+    }
   });
 })();
 </script>

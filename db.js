@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS stickers (
   url        TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS wishes (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  message    TEXT NOT NULL,
+  likes      INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wishes_order ON wishes(order_id);
 `);
 
 // Migration: add columns to orders if this is an existing database from
@@ -88,6 +98,22 @@ if (!orderColumns.includes('bride_photo_url')) {
 }
 if (!orderColumns.includes('groom_photo_url')) {
   db.exec('ALTER TABLE orders ADD COLUMN groom_photo_url TEXT');
+}
+if (!orderColumns.includes('groom_father_name')) {
+  db.exec('ALTER TABLE orders ADD COLUMN groom_father_name TEXT');
+}
+if (!orderColumns.includes('bride_father_name')) {
+  db.exec('ALTER TABLE orders ADD COLUMN bride_father_name TEXT');
+}
+if (!orderColumns.includes('program_schedule')) {
+  // JSON array of { label, time }, e.g. [{"label":"استقبال الضيوف","time":"18:30"}]
+  db.exec('ALTER TABLE orders ADD COLUMN program_schedule TEXT');
+}
+if (!orderColumns.includes('venue_lat')) {
+  db.exec('ALTER TABLE orders ADD COLUMN venue_lat REAL');
+}
+if (!orderColumns.includes('venue_lng')) {
+  db.exec('ALTER TABLE orders ADD COLUMN venue_lng REAL');
 }
 
 module.exports = db;
