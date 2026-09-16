@@ -10,7 +10,6 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const db = require('./db');
 const { uniqueOrderSlug } = require('./lib/slug');
-const { getSetting, setSetting, deleteSetting } = require('./lib/settings');
 const { notifyNewLead } = require('./lib/mailer');
 const { resizeImageInPlace } = require('./lib/images');
 
@@ -25,7 +24,6 @@ const INSTAGRAM_URL = process.env.INSTAGRAM_URL || '#';
 // these are actually displayed at.
 const PHOTO_MAX_DIMENSION = 1600;
 const STICKER_MAX_DIMENSION = 640;
-const HERO_MAX_DIMENSION = 1000; // hero sticker is displayed larger (up to 500px, more on wide/retina screens)
 
 const PLAN_LABELS = { basic: 'الأساسية', featured: 'المميزة' };
 const STATUS_LABELS = {
@@ -94,9 +92,8 @@ const uploadOrderBridePhoto = orderPhotoUploader('order-bride');
 const uploadOrderGroomPhoto = orderPhotoUploader('order-groom');
 
 // ---------------------------------------------------------------------------
-// Site-wide assets: background music + background stickers + hero sticker
-// override. All admin-managed, all optional — the site works fine with none
-// of these set (falls back to the built-in vector illustration, no music).
+// Per-order assets: music track + decorative background stickers, both
+// admin-managed per order (see the order-specific upload routes below).
 // ---------------------------------------------------------------------------
 const assetsDir = path.join(__dirname, 'public', 'uploads', 'assets');
 if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
@@ -116,18 +113,6 @@ const uploadMusic = multer({
     if (file.mimetype.startsWith('audio/')) return cb(null, true);
     cb(new Error('يجب أن يكون الملف صوتياً (mp3 أو ما شابه)'));
   },
-});
-
-const uploadSticker = multer({
-  storage: assetStorage('sticker'),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: photoFileFilter,
-});
-
-const uploadHeroSticker = multer({
-  storage: assetStorage('hero-sticker'),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: photoFileFilter,
 });
 
 // ---------------------------------------------------------------------------
@@ -323,50 +308,42 @@ const SAMPLE_ORDERS = {
     slug: 'demo-v1', groom_name: 'عمر', bride_name: 'لجين',
     event_date: futureDateISO(45), event_time: '19:00',
     venue: 'قاعة الماسة الكبرى — دمشق', plan: 'featured', style: 'v1',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v2: {
     slug: 'demo-v2', groom_name: 'كريم', bride_name: 'ريما',
     event_date: futureDateISO(30), event_time: '18:30',
     venue: 'حديقة الورد — دمشق', plan: 'featured', style: 'v2',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v3: {
     slug: 'demo-v3', groom_name: 'يزن', bride_name: 'دانة',
     event_date: futureDateISO(60), event_time: '20:00',
     venue: 'فندق الشام الكبير', plan: 'featured', style: 'v3',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v4: {
     slug: 'demo-v4', groom_name: 'سامر', bride_name: 'نور',
     event_date: futureDateISO(20), event_time: '19:30',
     venue: 'قاعة النجوم — دمشق', plan: 'featured', style: 'v4',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v5: {
     slug: 'demo-v5', groom_name: 'وائل', bride_name: 'هبة',
     event_date: futureDateISO(50), event_time: '20:30',
     venue: 'تراس الياسمين — دمشق', plan: 'featured', style: 'v5',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v6: {
     slug: 'demo-v6', groom_name: 'باسل', bride_name: 'مايا',
     event_date: futureDateISO(35), event_time: '18:00',
     venue: 'حديقة الأميرة — دمشق', plan: 'featured', style: 'v6',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
   v7: {
     slug: 'demo-v7', groom_name: 'فادي', bride_name: 'سلمى',
     event_date: futureDateISO(40), event_time: '19:00',
     venue: 'بستان الليالي — دمشق', plan: 'featured', style: 'v7',
-    video_url: '/assets/videos/envelope-intro.mp4',
   },
 };
 
 app.get('/demo/:style', (req, res) => {
   const sample = SAMPLE_ORDERS[req.params.style];
   if (!sample) return res.status(404).send('غير موجود');
-  const globalAssets = siteAssets();
   res.render('invitation', {
     order: sample,
     guest: null,
@@ -377,9 +354,7 @@ app.get('/demo/:style', (req, res) => {
     // one once the couple's admin uploads a video (see /invite/:slug below).
     introVideoUrl: DEFAULT_INTRO_VIDEO_URL,
     programSchedule: defaultSchedule(sample.event_time),
-    ...globalAssets,
-    // Same reasoning for background stickers: the site-wide gallery is
-    // showcase-only, never shown on a real order unless uploaded for it.
+    musicUrl: null,
     backgroundStickers: [],
   });
 });
@@ -434,7 +409,13 @@ function buildIcsContent(order) {
     `DTSTART:${fmt(start)}`,
     `DTEND:${fmt(end)}`,
     `SUMMARY:${icsEscape('حفل زفاف ' + order.groom_name + ' و' + order.bride_name)}`,
-    order.venue ? `LOCATION:${icsEscape(order.venue)}` : null,
+    // Fall back to the coordinates when only a map pin was set without a
+    // typed venue name, so the calendar event isn't left with no location
+    // at all in that case.
+    order.venue ? `LOCATION:${icsEscape(order.venue)}`
+      : (typeof order.venue_lat === 'number' && typeof order.venue_lng === 'number')
+        ? `LOCATION:${icsEscape(`${order.venue_lat},${order.venue_lng}`)}`
+        : null,
     `DESCRIPTION:${icsEscape('يسرنا دعوتكم لمشاركتنا فرحتنا')}`,
     'END:VEVENT',
     'END:VCALENDAR',
@@ -506,9 +487,13 @@ function parseScheduleJson(json) {
 function defaultSchedule(eventTime) {
   const [hh, mm] = (eventTime || '19:00').split(':').map(Number);
   const base = new Date(2000, 0, 1, hh || 19, mm || 0);
+  // For a late-night event (e.g. starting at 23:00), a later offset can spill
+  // past midnight — mark that explicitly instead of showing a bare time that
+  // reads as earlier than the start.
   const at = (offsetMinutes) => {
     const d = new Date(base.getTime() + offsetMinutes * 60000);
-    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const label = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return d.getDate() !== base.getDate() ? `${label} (اليوم التالي)` : label;
   };
   return [
     { label: 'استقبال الضيوف', time: at(0) },
@@ -516,16 +501,6 @@ function defaultSchedule(eventTime) {
     { label: 'حفل الزفاف', time: at(60) },
     { label: 'قص الكيكة', time: at(150) },
   ];
-}
-
-function siteAssets() {
-  return {
-    musicUrl: getSetting('background_music_url'),
-    heroStickerUrl: getSetting('hero_sticker_url'),
-    brideStickerUrl: getSetting('bride_sticker_url'),
-    groomStickerUrl: getSetting('groom_sticker_url'),
-    backgroundStickers: db.prepare('SELECT url FROM stickers ORDER BY created_at DESC').all().map((s) => s.url),
-  };
 }
 
 // The door-opening intro is a showcase asset used only on /demo template
@@ -542,26 +517,19 @@ function orderProgramSchedule(order) {
 app.get('/invite/:slug', (req, res) => {
   const order = loadOrderBySlug(req.params.slug);
   if (!order) return res.status(404).send('الدعوة غير موجودة');
-  const globalAssets = siteAssets();
-  // Use order-specific music if exists, else fallback to global
-  const musicUrl = order.music_url || globalAssets.musicUrl;
-  // Background stickers are order-specific only — an order with none
-  // uploaded shows none, regardless of the site-wide sticker gallery.
+  // Music and background stickers are order-specific only — an order with
+  // none uploaded shows none. No site-wide fallback of any kind.
   let backgroundStickers = [];
   if (order.sticker_urls) {
     try { backgroundStickers = JSON.parse(order.sticker_urls); } catch(e) { backgroundStickers = []; }
   }
-  // Other assets (hero, bride, groom stickers) remain global
   res.render('invitation', {
     order,
     guest: null,
     waLink: waLink(),
     BASE_URL,
-    musicUrl,
+    musicUrl: order.music_url || null,
     backgroundStickers,
-    heroStickerUrl: globalAssets.heroStickerUrl,
-    brideStickerUrl: globalAssets.brideStickerUrl,
-    groomStickerUrl: globalAssets.groomStickerUrl,
     // Real invitations stay video-free until the couple's admin uploads one
     // — the default door intro is a templates-only showcase (see /demo above).
     introVideoUrl: order.video_url || null,
@@ -576,8 +544,6 @@ app.get('/invite/:slug/:guestSlug', (req, res) => {
     .prepare('SELECT * FROM guests WHERE order_id = ? AND slug = ?')
     .get(order.id, req.params.guestSlug);
   if (!guest) return res.status(404).send('الرابط غير صحيح');
-  const globalAssets = siteAssets();
-  const musicUrl = order.music_url || globalAssets.musicUrl;
   // Background stickers are order-specific only — see note above.
   let backgroundStickers = [];
   if (order.sticker_urls) {
@@ -588,11 +554,8 @@ app.get('/invite/:slug/:guestSlug', (req, res) => {
     guest,
     waLink: waLink(),
     BASE_URL,
-    musicUrl,
+    musicUrl: order.music_url || null,
     backgroundStickers,
-    heroStickerUrl: globalAssets.heroStickerUrl,
-    brideStickerUrl: globalAssets.brideStickerUrl,
-    groomStickerUrl: globalAssets.groomStickerUrl,
     // Real invitations stay video-free until the couple's admin uploads one
     // — the default door intro is a templates-only showcase (see /demo above).
     introVideoUrl: order.video_url || null,
@@ -1030,169 +993,6 @@ app.get('/admin/orders/:id/rsvps.csv', requireAdmin, (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="rsvps-${order.slug}.csv"`);
   res.send(csv);
-});
-
-// ---------------------------------------------------------------------------
-// Site-wide settings: background music, background stickers, hero sticker,
-// bride sticker, groom sticker.
-// These apply to every invitation, not one specific order.
-// ---------------------------------------------------------------------------
-function renderSettings(res, error) {
-  res.render('admin-settings', {
-    musicUrl: getSetting('background_music_url'),
-    heroStickerUrl: getSetting('hero_sticker_url'),
-    brideStickerUrl: getSetting('bride_sticker_url'),
-    groomStickerUrl: getSetting('groom_sticker_url'),
-    backgroundStickers: db.prepare('SELECT * FROM stickers ORDER BY created_at DESC').all(),
-    error: error || null,
-  });
-}
-
-app.get('/admin/settings', requireAdmin, (req, res) => {
-  renderSettings(res, null);
-});
-
-app.post('/admin/settings/music', requireAdmin, (req, res) => {
-  uploadMusic.single('music_file')(req, res, (err) => {
-    if (err) {
-      return renderSettings(res, err.message === 'يجب أن يكون الملف صوتياً (mp3 أو ما شابه)' ? err.message : 'تعذر رفع الملف الصوتي (الحد الأقصى 15 ميجابايت)');
-    }
-    if (!csrfOk(req)) return rejectCsrfAfterUpload(req, res);
-    if (req.file) {
-      const oldUrl = getSetting('background_music_url');
-      if (oldUrl) {
-        const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-        fs.unlink(oldPath, () => {});
-      }
-      setSetting('background_music_url', `/assets/uploads/assets/${req.file.filename}`);
-    }
-    res.redirect('/admin/settings');
-  });
-});
-
-app.post('/admin/settings/music/delete', requireAdmin, requireCsrf, (req, res) => {
-  const oldUrl = getSetting('background_music_url');
-  if (oldUrl) {
-    const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-    fs.unlink(oldPath, () => {});
-  }
-  deleteSetting('background_music_url');
-  res.redirect('/admin/settings');
-});
-
-app.post('/admin/settings/hero-sticker', requireAdmin, (req, res) => {
-  uploadHeroSticker.single('sticker_file')(req, res, async (err) => {
-    if (err) {
-      return renderSettings(res, err.message === 'يجب أن تكون الصورة بصيغة صحيحة' ? err.message : 'تعذر رفع الصورة (الحد الأقصى 5 ميجابايت)');
-    }
-    if (!csrfOk(req)) return rejectCsrfAfterUpload(req, res);
-    if (req.file) {
-      await resizeImageInPlace(req.file.path, HERO_MAX_DIMENSION);
-      const oldUrl = getSetting('hero_sticker_url');
-      if (oldUrl) {
-        const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-        fs.unlink(oldPath, () => {});
-      }
-      setSetting('hero_sticker_url', `/assets/uploads/assets/${req.file.filename}`);
-    }
-    res.redirect('/admin/settings');
-  });
-});
-
-app.post('/admin/settings/hero-sticker/delete', requireAdmin, requireCsrf, (req, res) => {
-  const oldUrl = getSetting('hero_sticker_url');
-  if (oldUrl) {
-    const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-    fs.unlink(oldPath, () => {});
-  }
-  deleteSetting('hero_sticker_url');
-  res.redirect('/admin/settings');
-});
-
-// Bride sticker
-app.post('/admin/settings/bride-sticker', requireAdmin, (req, res) => {
-  uploadHeroSticker.single('sticker_file')(req, res, async (err) => {
-    if (err) {
-      return renderSettings(res, err.message === 'يجب أن تكون الصورة بصيغة صحيحة' ? err.message : 'تعذر رفع الصورة (الحد الأقصى 5 ميجابايت)');
-    }
-    if (!csrfOk(req)) return rejectCsrfAfterUpload(req, res);
-    if (req.file) {
-      await resizeImageInPlace(req.file.path, STICKER_MAX_DIMENSION);
-      const oldUrl = getSetting('bride_sticker_url');
-      if (oldUrl) {
-        const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-        fs.unlink(oldPath, () => {});
-      }
-      setSetting('bride_sticker_url', `/assets/uploads/assets/${req.file.filename}`);
-    }
-    res.redirect('/admin/settings');
-  });
-});
-
-app.post('/admin/settings/bride-sticker/delete', requireAdmin, requireCsrf, (req, res) => {
-  const oldUrl = getSetting('bride_sticker_url');
-  if (oldUrl) {
-    const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-    fs.unlink(oldPath, () => {});
-  }
-  deleteSetting('bride_sticker_url');
-  res.redirect('/admin/settings');
-});
-
-// Groom sticker
-app.post('/admin/settings/groom-sticker', requireAdmin, (req, res) => {
-  uploadHeroSticker.single('sticker_file')(req, res, async (err) => {
-    if (err) {
-      return renderSettings(res, err.message === 'يجب أن تكون الصورة بصيغة صحيحة' ? err.message : 'تعذر رفع الصورة (الحد الأقصى 5 ميجابايت)');
-    }
-    if (!csrfOk(req)) return rejectCsrfAfterUpload(req, res);
-    if (req.file) {
-      await resizeImageInPlace(req.file.path, STICKER_MAX_DIMENSION);
-      const oldUrl = getSetting('groom_sticker_url');
-      if (oldUrl) {
-        const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-        fs.unlink(oldPath, () => {});
-      }
-      setSetting('groom_sticker_url', `/assets/uploads/assets/${req.file.filename}`);
-    }
-    res.redirect('/admin/settings');
-  });
-});
-
-app.post('/admin/settings/groom-sticker/delete', requireAdmin, requireCsrf, (req, res) => {
-  const oldUrl = getSetting('groom_sticker_url');
-  if (oldUrl) {
-    const oldPath = path.join(__dirname, 'public', oldUrl.replace('/assets/', ''));
-    fs.unlink(oldPath, () => {});
-  }
-  deleteSetting('groom_sticker_url');
-  res.redirect('/admin/settings');
-});
-
-// Background stickers are a gallery (many), unlike music/hero sticker (one each).
-app.post('/admin/settings/stickers', requireAdmin, (req, res) => {
-  uploadSticker.single('sticker_file')(req, res, async (err) => {
-    if (err) {
-      return renderSettings(res, err.message === 'يجب أن تكون الصورة بصيغة صحيحة' ? err.message : 'تعذر رفع الصورة (الحد الأقصى 5 ميجابايت)');
-    }
-    if (!csrfOk(req)) return rejectCsrfAfterUpload(req, res);
-    if (req.file) {
-      await resizeImageInPlace(req.file.path, STICKER_MAX_DIMENSION);
-      const publicPath = `/assets/uploads/assets/${req.file.filename}`;
-      db.prepare('INSERT INTO stickers (url) VALUES (?)').run(publicPath);
-    }
-    res.redirect('/admin/settings');
-  });
-});
-
-app.post('/admin/settings/stickers/:id/delete', requireAdmin, requireCsrf, (req, res) => {
-  const sticker = db.prepare('SELECT * FROM stickers WHERE id = ?').get(req.params.id);
-  if (sticker) {
-    const filePath = path.join(__dirname, 'public', sticker.url.replace('/assets/', ''));
-    fs.unlink(filePath, () => {});
-    db.prepare('DELETE FROM stickers WHERE id = ?').run(req.params.id);
-  }
-  res.redirect('/admin/settings');
 });
 
 // ---------------------------------------------------------------------------

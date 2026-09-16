@@ -455,17 +455,15 @@ test('deleting a single sticker removes only that file, keeping the rest', async
   fs.unlinkSync(pathB);
 });
 
-test('invitation page shows no background stickers for an order with none, even when a site-wide sticker gallery exists', async () => {
+test('invitation page shows no background stickers for an order with none uploaded', async () => {
   const agent = request.agent(app);
   const csrf = await loginAsAdmin(agent);
   const create = await agent.post('/admin/orders').type('form').send({ groom_name: 'بلا', bride_name: 'ملصقات', _csrf: csrf });
   const orderId = create.headers.location.split('/').pop();
   const order = db.prepare('SELECT slug FROM orders WHERE id = ?').get(orderId);
 
-  db.prepare("INSERT INTO stickers (url) VALUES ('/assets/uploads/assets/global-gallery-sticker.png')").run();
-
   const page = await request(app).get(`/invite/${order.slug}`);
-  assert.doesNotMatch(page.text, /global-gallery-sticker\.png/, 'an order with no stickers of its own must not show the site-wide gallery sticker');
+  assert.match(page.text, /"bgStickers":\[\]/, 'an order with no stickers of its own must render an empty sticker list');
 });
 
 test('deleting the order music removes the file and clears the field', async () => {
@@ -608,6 +606,66 @@ test('GET /invite/:slug/calendar.ics 404s when no event date is set, and works f
   const demo = await request(app).get('/invite/demo-v1/calendar.ics');
   assert.equal(demo.status, 200);
   assert.match(demo.text, /BEGIN:VCALENDAR/);
+});
+
+test('venue coordinates from the map picker persist and take priority over a text search on the invitation page', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+  const create = await agent.post('/admin/orders').type('form').send({
+    groom_name: 'موقع', bride_name: 'محدد', venue: 'قاعة الاختبار',
+    venue_lat: '33.5138', venue_lng: '36.2765', _csrf: csrf,
+  });
+  const order = db.prepare('SELECT slug FROM orders WHERE id = ?').get(create.headers.location.split('/').pop());
+
+  const page = await request(app).get(`/invite/${order.slug}`);
+  assert.match(page.text, /q=33\.5138,36\.2765&output=embed/, 'the map embed should use the saved coordinates');
+  assert.match(page.text, /query=33\.5138,36\.2765/, 'the "open in Google Maps" link should use the saved coordinates');
+
+  const ics = await request(app).get(`/invite/${order.slug}/calendar.ics`);
+  assert.equal(ics.status, 404, 'no event date was set on this order, so there is no calendar file to check location on');
+});
+
+test('an invalid/partial venue_lat or venue_lng is ignored and falls back to a text search on the venue name', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+  const create = await agent.post('/admin/orders').type('form').send({
+    groom_name: 'موقع', bride_name: 'نصي', venue: 'قاعة الياسمين',
+    venue_lat: 'not-a-number', venue_lng: '36.2765', _csrf: csrf,
+  });
+  const order = db.prepare('SELECT slug, venue_lat, venue_lng FROM orders WHERE id = ?').get(create.headers.location.split('/').pop());
+  assert.equal(order.venue_lat, null);
+  assert.equal(order.venue_lng, null);
+
+  const page = await request(app).get(`/invite/${order.slug}`);
+  assert.match(page.text, new RegExp(`q=${encodeURIComponent('قاعة الياسمين')}&output=embed`));
+});
+
+test('a custom program schedule persists and renders; an empty one falls back to a default anchored on the event time', async () => {
+  const agent = request.agent(app);
+  const csrf = await loginAsAdmin(agent);
+
+  const withSchedule = await agent.post('/admin/orders').type('form').send({
+    groom_name: 'برنامج', bride_name: 'مخصص', event_time: '19:00',
+    program_schedule: 'استقبال الضيوف | 18:00\nحفل الزفاف | 20:00', _csrf: csrf,
+  });
+  const order1 = db.prepare('SELECT slug FROM orders WHERE id = ?').get(withSchedule.headers.location.split('/').pop());
+  const page1 = await request(app).get(`/invite/${order1.slug}`);
+  assert.match(page1.text, /استقبال الضيوف/);
+  assert.match(page1.text, /18:00/);
+
+  const withoutSchedule = await agent.post('/admin/orders').type('form').send({
+    groom_name: 'برنامج', bride_name: 'افتراضي', event_time: '19:00', _csrf: csrf,
+  });
+  const order2 = db.prepare('SELECT slug FROM orders WHERE id = ?').get(withoutSchedule.headers.location.split('/').pop());
+  const page2 = await request(app).get(`/invite/${order2.slug}`);
+  assert.match(page2.text, /استقبال الضيوف/, 'a default schedule should be generated from the event time when none is set');
+
+  const noTimeAtAll = await agent.post('/admin/orders').type('form').send({
+    groom_name: 'بدون', bride_name: 'برنامج', _csrf: csrf,
+  });
+  const order3 = db.prepare('SELECT slug FROM orders WHERE id = ?').get(noTimeAtAll.headers.location.split('/').pop());
+  const page3 = await request(app).get(`/invite/${order3.slug}`);
+  assert.doesNotMatch(page3.text, /program-block/, 'with no event time and no custom schedule, the program section should not render at all');
 });
 
 test('admin can delete a single RSVP entry', async () => {

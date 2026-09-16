@@ -54,27 +54,6 @@ CREATE TABLE IF NOT EXISTS rsvps (
 
 CREATE INDEX IF NOT EXISTS idx_guests_order ON guests(order_id);
 CREATE INDEX IF NOT EXISTS idx_rsvps_order ON rsvps(order_id);
-
-CREATE TABLE IF NOT EXISTS settings (
-  key   TEXT PRIMARY KEY,
-  value TEXT
-);
-
-CREATE TABLE IF NOT EXISTS stickers (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  url        TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS wishes (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  name       TEXT NOT NULL,
-  message    TEXT NOT NULL,
-  likes      INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_wishes_order ON wishes(order_id);
 `);
 
 // Migration: add columns to orders if this is an existing database from

@@ -136,15 +136,6 @@
   }
   .bg-sticker.show { opacity: 0.45; }
 
-  /* ====== ملصقات العروس والعريس الجانبية (من إعدادات الموقع العامة) ====== */
-  .corner-sticker.bride { position: fixed; bottom: 20px; right: 20px; width: 100px; opacity: 0.7; z-index: 10; }
-  .corner-sticker.groom { position: fixed; bottom: 20px; left: 20px; width: 100px; opacity: 0.7; z-index: 10; }
-  @media (max-width: 600px) {
-    /* على الجوال المساحة ضيقة وهذه الملصقات تتداخل مع زر الموسيقى وبطاقة
-       الدعوة، لذا نخفيها بدل تصغيرها فقط */
-    .corner-sticker.bride, .corner-sticker.groom { display: none; }
-  }
-
   /* ====== زر تشغيل الموسيقى ====== */
   #musicToggle {
     position: fixed;
@@ -813,14 +804,6 @@
 </head>
 
 <body data-style="<%= order.style %>">
-
-<!-- ====== ملصقات العروس والعريس الجانبية (إعدادات الموقع العامة، إن وجدت) ====== -->
-<% if (typeof brideStickerUrl !== 'undefined' && brideStickerUrl) { %>
-  <img src="<%= brideStickerUrl %>" class="corner-sticker bride" alt="عروس" />
-<% } %>
-<% if (typeof groomStickerUrl !== 'undefined' && groomStickerUrl) { %>
-  <img src="<%= groomStickerUrl %>" class="corner-sticker groom" alt="عريس" />
-<% } %>
 
 <!-- ====== خلفية كانفاس للتأثيرات البصرية ====== -->
 <canvas id="fx"></canvas>

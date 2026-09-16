@@ -14,7 +14,6 @@
       <% if (newCount > 0) { %><span class="new-badge"><%= newCount %> جديد</span><% } %>
     </div>
     <div style="display:flex; gap:10px;">
-      <a href="/admin/settings" class="btn btn-ghost btn-sm">الإعدادات</a>
       <form method="POST" action="/admin/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-ghost btn-sm" type="submit">تسجيل الخروج</button></form>
     </div>
   </div>

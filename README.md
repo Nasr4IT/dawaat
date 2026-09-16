@@ -2,16 +2,16 @@
 
 Turns the static landing page into a working system: a lead form on the
 site feeds an admin dashboard, each order gets an auto-generated invitation
-page once you fill in the details, guests can RSVP for real, and the
-luxury plan's guest-specific links work.
+page once you fill in the details, and guests can RSVP for real (featured
+plan).
 
 ## What this does (and doesn't) automate
 
 - **Fully automatic:** once you (the admin) enter a couple's names, date,
-  venue, plan and pick one of the 3 styles, the public invitation page
-  (`/invite/<slug>`) is generated instantly — countdown timer, opening
-  video, RSVP form, guest-specific links, and a branded link preview for
-  WhatsApp, all live. No coding per order.
+  venue, plan and pick one of the 7 styles, the public invitation page
+  (`/invite/<slug>`) is generated instantly — countdown timer, RSVP form
+  (featured plan), location map, and a branded link preview for WhatsApp,
+  all live. No coding per order.
 - **Still manual, on purpose:** producing the actual AI opening video for
   each couple. Upload the finished video file (or paste an external URL)
   on the order's page and it appears on their invitation page
@@ -31,7 +31,7 @@ dawaat/
   views/                 Admin pages + the public invitation page (EJS)
   public/landing.html    Your landing page (order form wired up)
   public/og/             Branded link-preview images (one per style)
-  public/videos/         The default envelope-opening sample video
+  public/videos/         The door-opening intro video shown on /demo templates
   public/uploads/videos/ Videos uploaded per order via /admin (not in Git)
   data/                  SQLite database file lives here (created on first run)
   .env.example           Copy to .env and fill in
@@ -48,14 +48,13 @@ dawaat/
    they've paid.
 4. Upload the opening video for that order (or paste an external URL) —
    it's optional; without one the invitation just opens straight to the
-   details.
+   details. (Demo/template pages always show a default door-opening
+   intro instead — that one's just for showing off the effect before
+   anyone orders.)
 5. When the invitation is ready, you get the shareable link right there
    on the order page and copy it to send to the couple. Mark the order
    `published`.
-6. For the luxury plan, add each guest's name under "روابط مخصصة
-   بأسماء الضيوف" — each gets their own link and their RSVP is tracked
-   individually.
-7. Guests RSVP on the page itself; responses land in the order's RSVP
+6. Guests RSVP on the page itself; responses land in the order's RSVP
    list in real time, and you can export them as a CSV for the venue or
    caterer headcount.
 
@@ -137,22 +136,19 @@ warning on startup if the password hash or session secret are missing.
    invitation links AND the WhatsApp link-preview images, so it must be
    the real public HTTPS domain for the preview images to load.
 
-## Site-wide settings (music, stickers)
+## Per-order music and stickers
 
-`/admin/settings` controls things that apply to every invitation, not one
-specific order:
+From an order's admin page you can optionally upload:
 
-- **Background music** — one audio file, played on every invitation via a
+- **Background music** — one audio file for that invitation, played via a
   small toggle button (browsers block autoplay-with-sound, so a guest has
   to tap it once; volume fades in smoothly after that).
-- **Hero sticker** — replaces the built-in bride & groom illustration when
-  a couple hasn't uploaded their own photo.
-- **Background stickers** — a small gallery of images that fade in and
-  drift slowly in the page background while a guest scrolls. Upload none
-  and 3 simple built-in vector stickers (heart, rings, floral sprig) are
-  used instead, tinted to match each style's color.
+- **Background stickers** — a small set of images that fade in and drift
+  slowly in the page background while a guest scrolls.
 
-None of these are required — the site works with none of them set.
+Both are entirely optional and scoped to that one order — an order with
+nothing uploaded shows no music and no stickers, regardless of what other
+orders have set. There's no site-wide/global version of either.
 
 ## Backing up
 
